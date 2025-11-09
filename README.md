@@ -50,18 +50,19 @@ pip install -r requirements.txt
 ```
 ### 🧪 Usage
 
-Launch the website.
+- Launch the website.
+- Upload a patient MRI image.
+- View the predicted class (AD, CN, EMCI, LMCI).
+- Examine the XAI explanation map to understand which regions influenced the model’s decision.
 
-Upload a patient MRI image.
-
-View the predicted class (AD, CN, EMCI, LMCI).
-
-Examine the XAI explanation map to understand which regions influenced the model’s decision.
+---
 
 ### 📊 Model Insights
 
 The model uses deep convolutional neural networks (CNNs) trained on MRI datasets,
 and explainability is achieved through Grad-CAM or similar visualization techniques to show highlighted brain regions relevant to prediction.
+
+--- 
 
 ### 🤝 Contributing
 
