@@ -35,7 +35,16 @@
           });
 
           const data = await res.json();
-          resultDiv.textContent = `✅ Prediction: ${data.prediction}`;
+          console.log("Server response:", data);
+
+          if (data.error) {
+            resultDiv.textContent = `❌ Error: ${data.error}`;
+          } else {
+            const pred = data.prediction ?? data.Prediction ?? data.label ?? "(no prediction)";
+            const conf = (data.confidence !== undefined) ? Number(data.confidence) : (data.confidence_score || null);
+            const confText = (conf !== null && !isNaN(conf)) ? ` — confidence: ${(conf * 100).toFixed(2)}%` : "";
+            resultDiv.textContent = `✅ Prediction: ${pred}${confText}`;
+          }
         } catch (err) {
           resultDiv.textContent = "❌ Error connecting to server.";
           console.error(err);
