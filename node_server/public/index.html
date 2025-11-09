@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Alzheimer’s Prediction</title>
+  </head>
+  <body>
+    <h2>🧠 Upload MRI Image for Alzheimer’s Prediction</h2>
+
+    <form id="uploadForm">
+      <input type="file" id="imageInput" name="image" accept="image/*" required />
+      <button type="submit">Predict</button>
+    </form>
+
+    <div id="result"></div>
+
+    <script>
+      const form = document.getElementById("uploadForm");
+      const resultDiv = document.getElementById("result");
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+
+        const file = document.getElementById("imageInput").files[0];
+        const formData = new FormData();
+        formData.append("image", file);
+
+        resultDiv.textContent = "⏳ Predicting...";
+
+        try {
+          const res = await fetch("http://localhost:5001/api/predict", {
+            method: "POST",
+            body: formData,
+          });
+
+          const data = await res.json();
+          console.log("Server response:", data);
+
+          if (data.error) {
+            resultDiv.textContent = `❌ Error: ${data.error}`;
+          } else {
+            const pred = data.prediction ?? data.Prediction ?? data.label ?? "(no prediction)";
+            const conf = (data.confidence !== undefined) ? Number(data.confidence) : (data.confidence_score || null);
+            const confText = (conf !== null && !isNaN(conf)) ? ` — confidence: ${(conf * 100).toFixed(2)}%` : "";
+            resultDiv.textContent = `✅ Prediction: ${pred}${confText}`;
+          }
+        } catch (err) {
+          resultDiv.textContent = "❌ Error connecting to server.";
+          console.error(err);
+        }
+      });
+    </script>
+  </body>
+</html>
