@@ -47,7 +47,7 @@ npm install
 # Model setup
 cd ../Model
 pip install -r requirements.txt
-
+```
 ##🧪 Usage
 
 Launch the website.
