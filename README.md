@@ -48,7 +48,7 @@ npm install
 cd ../Model
 pip install -r requirements.txt
 ```
-##🧪 Usage
+### 🧪 Usage
 
 Launch the website.
 
@@ -58,12 +58,12 @@ View the predicted class (AD, CN, EMCI, LMCI).
 
 Examine the XAI explanation map to understand which regions influenced the model’s decision.
 
-##📊 Model Insights
+### 📊 Model Insights
 
 The model uses deep convolutional neural networks (CNNs) trained on MRI datasets,
 and explainability is achieved through Grad-CAM or similar visualization techniques to show highlighted brain regions relevant to prediction.
 
-##🤝 Contributing
+### 🤝 Contributing
 
 Contributions are welcome!
 If you’d like to improve model accuracy, UI/UX, or documentation:
@@ -76,12 +76,12 @@ Commit your changes
 
 Open a Pull Request
 
-##📄 License
+### 📄 License
 
 This project is licensed under the MIT License — see the LICENSE
  file for details.
 
-##💬 Contact
+### 💬 Contact
 
 Author: Ketan Jain
 
