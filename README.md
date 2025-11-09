@@ -1,118 +1,88 @@
-Alzimers-Prediction
+# 🧠 Alzheimer's Prediction
 
-A predictive web application with AI integration to help pre-detect and support early intervention for Alzheimer’s disease.
+A deep learning–based project for **early detection of Alzheimer's Disease (AD)** using MRI image data and explainable AI (XAI) techniques.  
+The system predicts the cognitive condition of a patient and classifies them into stages for better understanding and medical interpretation.
 
-🧠 Overview
+---
 
-Alzheimer’s disease (AD) is a progressive neurological disorder. Early detection enables better patient care, monitoring, and treatment planning.
-This project combines machine learning / deep learning models, a web server backend, and a frontend UI to provide a streamlined workflow: from data ingestion to prediction to insight delivery.
+## 📋 Project Overview
+Alzheimer’s Disease is a progressive neurodegenerative disorder that affects memory and cognition.  
+This project builds an intelligent model that predicts the stage of Alzheimer’s and provides **explainable visual insights** to help clinicians interpret model decisions.
 
-Features
+---
 
-A trained model (or ensemble) for Alzheimer’s risk prediction based on input features.
+## 🚀 Key Features
+- 🧩 **Deep Learning Model** for MRI-based Alzheimer’s classification  
+- 🔍 **Explainable AI (XAI)** visualization for each prediction  
+- 🌐 **Web Interface** for easy patient image upload and results display  
+- 🧠 **Four-Class Prediction:**
+  - **Alzheimer’s Disease (AD)**
+  - **Cognitively Normal (CN)**
+  - **Early Mild Cognitive Impairment (EMCI)**
+  - **Late Mild Cognitive Impairment (LMCI)**
+- 📦 Organized modules for training, inference, and deployment
 
-A clean frontend interface for clinicians/caregivers/users to input data & view results.
-
-A Node.js backend API to serve predictions and manage model communication.
-
-Modular folder structure:
-
-Model/ – training notebooks, saved model artifacts.
-
-node_server/ – backend logic, API endpoints.
-
-Fontend/ – UI code (HTML/CSS/JS).
-
-Easily extensible: swap the model, update UI, expand feature sets.
-
-Architecture
-User Interface (Fontend/)  ←→  Backend API (node_server/)  →  Prediction Engine (Model/)
+---
 
 
-User enters relevant data via the Frontend.
+---
 
-Frontend sends request to Backend.
+## ⚙️ Installation & Setup
 
-Backend loads model, invokes inference, returns results.
+### Prerequisites
+- Python 3.8+
+- Node.js (latest LTS)
+- pip and npm installed
 
-UI displays prediction and optionally actionable insights.
+### Steps
+```bash
+# Clone the repository
+git clone https://github.com/ketanjain113/Alzimers-Prediction.git
+cd Alzimers-Prediction
 
-Getting Started
-Prerequisites
+# Backend setup
+cd node_server
+npm install
 
-Node.js (latest LTS)
+# Model setup
+cd ../Model
+pip install -r requirements.txt
 
-Python 3.8+ (for model training & inference)
+##🧪 Usage
 
-Required packages (see Model/requirements.txt, node_server/package.json)
+Launch the website.
 
-Setup
+Upload a patient MRI image.
 
-Clone the repo:
+View the predicted class (AD, CN, EMCI, LMCI).
 
-git clone https://github.com/ketanjain113/Alzimers-Prediction.git  
-cd Alzimers-Prediction  
+Examine the XAI explanation map to understand which regions influenced the model’s decision.
 
+##📊 Model Insights
 
-Install backend dependencies:
+The model uses deep convolutional neural networks (CNNs) trained on MRI datasets,
+and explainability is achieved through Grad-CAM or similar visualization techniques to show highlighted brain regions relevant to prediction.
 
-cd node_server  
-npm install  
+##🤝 Contributing
 
+Contributions are welcome!
+If you’d like to improve model accuracy, UI/UX, or documentation:
 
-Install Python dependencies for model:
+Fork this repo
 
-cd ../Model  
-pip install -r requirements.txt  
+Create a new branch (feature-name)
 
+Commit your changes
 
-Train or deploy the model:
+Open a Pull Request
 
-Use notebooks in Model/ to train/tune your model.
+##📄 License
 
-Save the final model artifact (e.g., model.pkl, model.h5).
+This project is licensed under the MIT License — see the LICENSE
+ file for details.
 
-Configure the backend to point to the saved model artifact.
+##💬 Contact
 
-Launch the application:
+Author: Ketan Jain
 
-# Backend  
-cd ../node_server  
-npm start  
-# Frontend  
-# Open Fontend/index.html in browser or serve via static server  
-
-Usage
-
-Navigate to the frontend in your browser.
-
-Fill in the required input fields (e.g., age, cognitive test scores, medical history).
-
-Click Submit → the system returns a prediction (e.g., likelihood of Alzheimer’s) + optional guidance.
-
-Use responsibly: this is not a substitute for professional diagnosis.
-
-Contributing
-
-Open to community collaboration!
-
-Report bugs or raise issues for feature requests.
-
-Submit pull requests (PRs) — code style: 2-space indent, meaningful commit messages.
-
-If adding new features (e.g., new biomarkers, UI enhancements), update documentation accordingly.
-
-License
-
-Distributed under the MIT License. See LICENSE file for details.
-
-Acknowledgements
-
-Many thanks to open-source libraries and frameworks that make this possible (scikit-learn, TensorFlow/PyTorch, Express, etc).
-
-Inspired by the global need for early Alzheimer’s detection and care tools.
-
-Contact
-
-For questions or collaboration, feel free to reach out via GitHub Issues or contact me at [your-email@example.com
-].
+For questions or collaboration, please open an issue or contact via GitHub.
