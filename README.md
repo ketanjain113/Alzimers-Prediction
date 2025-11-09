@@ -48,7 +48,10 @@ npm install
 cd ../Model
 pip install -r requirements.txt
 ```
-### 🧪 Usage
+
+---
+
+## 🧪 Usage
 
 - Launch the website.
 - Upload a patient MRI image.
@@ -57,33 +60,27 @@ pip install -r requirements.txt
 
 ---
 
-### 📊 Model Insights
+## 📊 Model Insights
 
 The model uses deep convolutional neural networks (CNNs) trained on MRI datasets,
 and explainability is achieved through Grad-CAM or similar visualization techniques to show highlighted brain regions relevant to prediction.
 
 --- 
 
-### 🤝 Contributing
+## 🤝 Contributing
 
 Contributions are welcome!
 If you’d like to improve model accuracy, UI/UX, or documentation:
 
-Fork this repo
+- Fork this repo
+- Create a new branch (feature-name)
+- Commit your changes
+- Open a Pull Request
 
-Create a new branch (feature-name)
+---
 
-Commit your changes
+## 💬 Contact
 
-Open a Pull Request
-
-### 📄 License
-
-This project is licensed under the MIT License — see the LICENSE
- file for details.
-
-### 💬 Contact
-
-Author: Ketan Jain
+Author: Ketan Jain(https://github.com/ketanjain113), Kavish Jain(https://github.com/kavish200), Harsh Malviya(https://github.com/harshfly), Sarthak
 
 For questions or collaboration, please open an issue or contact via GitHub.
