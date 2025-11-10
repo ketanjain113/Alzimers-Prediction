@@ -24,6 +24,12 @@ app = Flask(__name__)
 CORS(app) 
 
 
+@app.route("/health", methods=["GET"])
+def health():
+    # Simple health endpoint so a proxy or load balancer can check readiness.
+    return jsonify({"status": "ok", "model_path": MODEL_PATH}), 200
+
+
 def preprocess_image_from_bytes(image_bytes, target_size=(128, 128)):
     img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
     img = img.resize((target_size[1], target_size[0]))
@@ -119,4 +125,5 @@ if __name__ == "__main__":
     port = int(os.environ.get("MODEL_PORT", os.environ.get("PORT", 5000)))
     debug_env = os.environ.get("DEBUG", "false").lower()
     debug = debug_env in ("1", "true", "yes")
+    print(f"Starting Model API on 0.0.0.0:{port}, model_path={MODEL_PATH}")
     app.run(host="0.0.0.0", port=port, debug=debug)

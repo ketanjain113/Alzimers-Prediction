@@ -48,6 +48,7 @@
       <div class="scan-card section">
         <h3>Upload Medical Images</h3>
         <div class="uploader" style="margin-top:12px; text-align:center;">
+        <div id="serviceStatus" class="muted small" style="margin-bottom:8px;">Checking model service…</div>
           <input id="file" type="file" accept=".jpg,.png,.jpeg,.dcm" style="display:none">
           <label for="file" class="btn secondary">Upload MRI / CT / PET</label>
           <div style="margin-top:10px;">
@@ -80,8 +81,30 @@
     const resultBox = document.getElementById("resultBox");
     const predictionEl = document.getElementById("prediction");
     const confidenceEl = document.getElementById("confidence");
+  const serviceStatus = document.getElementById("serviceStatus");
 
     let selectedFile = null;
+
+    // Check backend/model health on load
+    async function checkService() {
+      try {
+        const resp = await fetch('/api/health');
+        if (!resp.ok) throw new Error('Service unreachable');
+        const data = await resp.json();
+        serviceStatus.textContent = 'Model service: online';
+        serviceStatus.style.color = 'green';
+        analyzeBtn.disabled = false;
+        return true;
+      } catch (err) {
+        serviceStatus.textContent = `Model service: offline — ${err.message}`;
+        serviceStatus.style.color = 'crimson';
+        analyzeBtn.disabled = true;
+        return false;
+      }
+    }
+
+    // Immediately check service on page load
+    checkService();
 
     // When file selected
     fileInput.addEventListener("change", (e) => {

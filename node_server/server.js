@@ -25,11 +25,14 @@ app.get('/', (req, res) => {
 });
 
 
-// ✅ image upload + forward to Python
 const MODEL_API_URL = process.env.MODEL_API_URL || "http://127.0.0.1:5000";
 
 app.post("/api/predict", upload.single("image"), async (req, res) => {
   try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded. Send multipart form-data with field 'image'." });
+    }
+
     const form = new FormData();
     form.append("image", fs.createReadStream(req.file.path));
 
@@ -56,6 +59,28 @@ app.post("/api/predict", upload.single("image"), async (req, res) => {
   } catch (err) {
     console.error("❌ Error:", err.message);
     res.status(500).json({ error: err.message });
+  }
+});
+
+
+// Health proxy so frontend or deploy platform can check model readiness
+app.get("/api/health", async (req, res) => {
+  try {
+    const resp = await fetch(`${MODEL_API_URL}/health`);
+    const txt = await resp.text();
+    if (!resp.ok) {
+      return res.status(502).json({ error: `Model health check failed: ${resp.status}`, body: txt });
+    }
+    // try parse JSON
+    try {
+      const json = JSON.parse(txt);
+      return res.json({ upstream: json });
+    } catch (e) {
+      return res.json({ upstream_text: txt });
+    }
+  } catch (err) {
+    console.error("Health proxy error:", err.message);
+    return res.status(502).json({ error: `Unable to reach model at ${MODEL_API_URL}: ${err.message}` });
   }
 });
 
