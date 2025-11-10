@@ -7,8 +7,14 @@ from PIL import Image
 import io
 import base64
 import logging
+import os
+import os.path as osp
 
-model = load_model("Model/Alzimer.keras", compile=False)
+# Resolve model path relative to this file so the script works whether started
+# from the repo root or from the Model directory.
+BASE_DIR = os.path.dirname(__file__)
+MODEL_PATH = osp.join(BASE_DIR, "Alzimer.keras")
+model = load_model(MODEL_PATH, compile=False)
 class_labels = ["Alzheimer's Disease: The scan shows significant brain tissue loss in memory and reasoning areas, consistent with advanced Alzheimer’s.", 
                 "Cognitively Normal: The brain structure appears healthy with no visible signs of shrinkage or abnormal patterns.", 
                 "Early Mild Cognitive Impairment (EMCI): Mild changes are visible in memory-related regions, suggesting early signs of cognitive decline.", 
@@ -107,4 +113,10 @@ def predict():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    # Prefer MODEL_PORT for the model service so it doesn't collide with the
+    # container-level $PORT that hosting providers (e.g. Railway) supply to the
+    # primary web process. Fallback to PORT then to 5000.
+    port = int(os.environ.get("MODEL_PORT", os.environ.get("PORT", 5000)))
+    debug_env = os.environ.get("DEBUG", "false").lower()
+    debug = debug_env in ("1", "true", "yes")
+    app.run(host="0.0.0.0", port=port, debug=debug)

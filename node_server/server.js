@@ -26,13 +26,15 @@ app.get('/', (req, res) => {
 
 
 // ✅ image upload + forward to Python
+const MODEL_API_URL = process.env.MODEL_API_URL || "http://127.0.0.1:5000";
+
 app.post("/api/predict", upload.single("image"), async (req, res) => {
   try {
     const form = new FormData();
     form.append("image", fs.createReadStream(req.file.path));
 
     // forward to Flask API
-    const response = await fetch("http://127.0.0.1:5000/predict", {
+    const response = await fetch(`${MODEL_API_URL}/predict`, {
       method: "POST",
       body: form,
     });
@@ -57,5 +59,6 @@ app.post("/api/predict", upload.single("image"), async (req, res) => {
   }
 });
 
-// ✅ Run Node on port 5001 (keep Flask on 5000)
-app.listen(5001, () => console.log("🚀 Node server running on http://localhost:5001"));
+// ✅ Run Node on configurable port (Railway provides $PORT)
+const PORT = process.env.PORT || 5001;
+app.listen(PORT, () => console.log(`🚀 Node server running on http://0.0.0.0:${PORT} (MODEL_API_URL=${MODEL_API_URL})`));

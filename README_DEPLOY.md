@@ -29,3 +29,32 @@ Troubleshooting
 Local testing
 - Run the model locally: `cd Model && pip install -r requirements.txt && python ModelAPI.py`
 - Run the node server locally: `cd node_server && npm install && $env:MODEL_API_URL="http://127.0.0.1:5000"; node server.js`
+
+## Deploy via Docker on Railway (recommended single-container)
+
+This repository includes a `Dockerfile` that creates a single container running both the
+Flask model API and the Node server. Railway can build and run this image directly.
+
+Quick steps:
+
+1. In Railway, create a new project and choose "Deploy from GitHub" (connect your repo).
+2. When Railway prompts for a Dockerfile, it will detect the root `Dockerfile` automatically.
+3. Deploy — Railway will build the image. The container will start both services using
+   `start.sh`.
+
+Notes:
+- When deploying a single Docker container on Railway, Railway will set a single `$PORT`
+  that the platform expects your main web process to bind to. To avoid both services
+  trying to bind the same port, set the following environment variable in Railway:
+  - `MODEL_PORT=5000` (the model API will bind to this port)
+  Railway will set `$PORT` (e.g., 3000) which the Node server will use. The Node server
+  forwards requests to the model API at `http://127.0.0.1:5000` inside the container by default.
+- If you prefer separate Railway services (recommended in some cases), deploy `Model` as
+  one service (set Root Directory to `Model`) and `node_server` as another (Root Directory
+  `node_server`). Then set `MODEL_API_URL` in the Node service to the Model service URL.
+
+Troubleshooting:
+- TensorFlow wheels are large — building the Docker image may take a while.
+- If Railway's build times out or you hit resource limits, consider hosting the model in a
+  separate service provider (Blob/S3 + download at startup) or using a smaller model.
+
