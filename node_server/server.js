@@ -16,13 +16,39 @@ if (!fs.existsSync(uploadDir)) {
 // ✅ multer config
 const upload = multer({ dest: uploadDir });
 
-// ✅ serve frontend files
-app.use(express.static(path.join(__dirname, "../Frontend")));
+// ✅ serve frontend files (robust lookup)
+const candidateFrontendDirs = [
+  path.join(__dirname, '..', 'Frontend'), // expected when running from node_server folder
+  path.join(process.cwd(), 'Frontend'),    // when started from repository root
+  path.join(__dirname, 'Frontend'),        // if Frontend is next to server.js (unlikely)
+];
 
+let frontendDir = null;
+for (const d of candidateFrontendDirs) {
+  try {
+    if (fs.existsSync(d) && fs.statSync(d).isDirectory()) {
+      frontendDir = d;
+      break;
+    }
+  } catch (e) {
+    // ignore and try next
+  }
+}
 
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '../Frontend', 'index.html'));
-});
+if (frontendDir) {
+  console.log(`📁 Serving frontend from: ${frontendDir}`);
+  app.use(express.static(frontendDir));
+
+  app.get('/', (req, res) => {
+    res.sendFile(path.join(frontendDir, 'index.html'));
+  });
+} else {
+  console.warn('⚠️ Frontend directory not found. Expected one of:', candidateFrontendDirs);
+  // minimal fallback so root doesn't crash with ENOENT
+  app.get('/', (req, res) => {
+    res.status(404).send('<h1>Frontend not available</h1><p>Make sure the `Frontend` folder is present next to the project root or start the server from the repository root.</p>');
+  });
+}
 
 
 const MODEL_API_URL = process.env.MODEL_API_URL || "http://127.0.0.1:5000";
