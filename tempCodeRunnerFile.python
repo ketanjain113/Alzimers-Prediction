@@ -1,0 +1,4 @@
+import tensorflow as tf
+m = tf.keras.models.load_model('Model/Alzimer.keras', compile=False)
+# OR: HDF5 (single file)
+m.save('Model/Alzimer.h5')
