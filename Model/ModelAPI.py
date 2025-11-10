@@ -76,6 +76,9 @@ def try_load_model(path):
         # resolve to the tf.keras equivalents. We do this only temporarily.
         shim_keys = ['keras', 'keras.initializers', 'keras.regularizers', 'keras.layers', 'keras.utils', 'keras.models']
         saved_modules = {k: sys.modules.get(k) for k in shim_keys}
+        # Prepare to possibly patch mixed_precision.get_policy to accept
+        # string dtype names during deserialization. We'll restore it later.
+        saved_get_policy = None
         try:
             sys.modules['keras'] = types.ModuleType('keras')
             # Map submodules to tf.keras modules where possible
@@ -113,8 +116,32 @@ def try_load_model(path):
 
             logging.info("Inserted keras -> tf.keras shim modules into sys.modules for deserialization compatibility.")
 
-            model = load_model(path, compile=False)
-            return model
+                # Patch tf.keras.mixed_precision.policy.get_policy during load so
+                # that if a string dtype slips through we create a Policy object
+                # rather than letting code attempt to access a .name attribute on
+                # a plain string.
+                try:
+                    mp = tf.keras.mixed_precision
+                    if hasattr(mp, 'policy') and hasattr(mp.policy, 'get_policy'):
+                        saved_get_policy = mp.policy.get_policy
+                        def _patched_get_policy(dtype):
+                            # If dtype is already a Policy-like object, return original
+                            try:
+                                if isinstance(dtype, str):
+                                    return tf.keras.mixed_precision.Policy(dtype)
+                                return saved_get_policy(dtype)
+                            except Exception:
+                                # defensively try to convert string->Policy
+                                if isinstance(dtype, str):
+                                    return tf.keras.mixed_precision.Policy(dtype)
+                                raise
+                        mp.policy.get_policy = _patched_get_policy
+                        logging.info("Patched tf.keras.mixed_precision.policy.get_policy to accept string dtype names.")
+                except Exception:
+                    logging.exception("Failed to patch mixed_precision.get_policy")
+
+                model = load_model(path, compile=False)
+                return model
         finally:
             # Restore any previously existing modules to avoid side-effects
             for k, v in saved_modules.items():
@@ -122,8 +149,67 @@ def try_load_model(path):
                     sys.modules.pop(k, None)
                 else:
                     sys.modules[k] = v
+                # Restore patched get_policy if we changed it
+                try:
+                    if saved_get_policy is not None:
+                        try:
+                            tf.keras.mixed_precision.policy.get_policy = saved_get_policy
+                        except Exception:
+                            # some TF builds expose policy via tf.keras.mixed_precision
+                            try:
+                                tf.keras.mixed_precision.policy.get_policy = saved_get_policy
+                            except Exception:
+                                pass
+                except Exception:
+                    logging.exception("Failed to restore mixed_precision.get_policy during cleanup")
     except Exception:
         logging.exception("Compatibility fallback failed")
+        try:
+            import h5py, json
+            if osp.exists(path):
+                try:
+                    with h5py.File(path, 'r') as f:
+                        model_config = None
+                        if 'model_config' in f.attrs:
+                            model_config = f.attrs['model_config']
+                        elif 'model_config' in f:
+                            # dataset
+                            model_config = f['model_config'][()]
+
+                        if model_config is not None:
+                            try:
+                                # model_config might be bytes
+                                if isinstance(model_config, bytes):
+                                    model_config = model_config.decode('utf-8')
+                                cfg_json = json.loads(model_config)
+                                # write a compact dump to logs
+                                logging.error("Model serialized config (root keys): %s", list(cfg_json.keys()))
+                                # Try to locate problematic layers (Conv2D / dtype entries)
+                                def _scan_layers(node, path=()):
+                                    if isinstance(node, dict):
+                                        for k, v in node.items():
+                                            if k == 'class_name' and v and 'Conv' in v:
+                                                logging.error("Found layer candidate at %s: %s", '/'.join(path), node)
+                                            elif k == 'config' and isinstance(v, dict):
+                                                if 'dtype' in v:
+                                                    logging.error("Layer with dtype at %s: %s", '/'.join(path), v)
+                                        for k, v in node.items():
+                                            _scan_layers(v, path + (str(k),))
+                                    elif isinstance(node, list):
+                                        for idx, item in enumerate(node):
+                                            _scan_layers(item, path + (str(idx),))
+
+                                _scan_layers(cfg_json)
+                            except Exception:
+                                logging.exception("Failed to parse model_config JSON for diagnostics")
+                        else:
+                            logging.error("No 'model_config' found in HDF5 file for extra diagnostics")
+                except Exception:
+                    logging.exception("Error while attempting to read HDF5 model file for diagnostics")
+        except Exception:
+            logging.info("h5py not available or diagnostics unavailable; skipping model_config dump")
+
+        # Re-raise the original exception so caller sees the failure.
         raise
 
 
