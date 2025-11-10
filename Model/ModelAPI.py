@@ -10,35 +10,24 @@ import logging
 import os
 import os.path as osp
 
-# Helpful version info in logs
 logging.basicConfig(level=logging.INFO)
 logging.info(f"Python executable: {os.sys.executable}")
 logging.info(f"tensorflow version: {tf.__version__}")
 try:
-    # Keras version (may be part of tf)
     import keras
     logging.info(f"keras version: {keras.__version__}")
 except Exception:
     logging.info("keras (standalone) not available; using tf.keras")
 
-# Resolve model path relative to this file so the script works whether started
-# from the repo root or from the Model directory.
 BASE_DIR = os.path.dirname(__file__)
 MODEL_PATH = osp.join(BASE_DIR, "Alzimer.keras")
 
-# Compatibility loader: some models are serialized with configs that include
-# legacy keys (for example 'batch_shape' on InputLayer). Newer Keras versions
-# may expect different config keys which causes deserialization errors like
-# "Unrecognized keyword arguments: ['batch_shape']". We attempt a normal load
-# first; on failure we monkeypatch InputLayer.from_config to accept
-# 'batch_shape' by mapping it to 'batch_input_shape', then retry.
 def try_load_model(path):
     try:
         return load_model(path, compile=False)
     except Exception as e:
         logging.exception("Initial model load failed; attempting compatibility fallback")
 
-    # Attempt monkeypatch for InputLayer.from_config to support 'batch_shape'
     try:
         from tensorflow.keras import layers as _layers
         _orig_from_config = _layers.InputLayer.from_config
@@ -48,17 +37,38 @@ def try_load_model(path):
                 # convert list -> tuple and rename key
                 config = dict(config)
                 config['batch_input_shape'] = tuple(config.pop('batch_shape'))
-            # call original
-            # _orig_from_config may be a function or classmethod wrapper
-            try:
-                return _orig_from_config.__func__(cls, config, custom_objects)
-            except Exception:
-                return _orig_from_config(config, custom_objects)
+
+            # Try several calling conventions for the original from_config to
+            # handle differences across Keras/TF versions (it may be a plain
+            # function, a bound method, or a classmethod).
+            call_attempts = []
+            # common variants
+            call_attempts.append(lambda: _orig_from_config(cls, config, custom_objects))
+            call_attempts.append(lambda: _orig_from_config(config, custom_objects))
+            call_attempts.append(lambda: _orig_from_config(cls, config))
+            call_attempts.append(lambda: _orig_from_config(config))
+            # If the original has __func__, try that form too
+            if hasattr(_orig_from_config, '__func__'):
+                call_attempts.insert(0, lambda: _orig_from_config.__func__(cls, config, custom_objects))
+
+            last_err = None
+            for fn in call_attempts:
+                try:
+                    return fn()
+                except TypeError as te:
+                    last_err = te
+                    continue
+                except Exception:
+                    # unexpected error — re-raise immediately to preserve traceback
+                    raise
+
+            # If we reach here, all attempts raised TypeError — raise the last one
+            if last_err is not None:
+                raise last_err
 
         _layers.InputLayer.from_config = classmethod(_patched_from_config)
         logging.info("Patched InputLayer.from_config to accept 'batch_shape' and map to 'batch_input_shape'.")
 
-        # Retry loading
         model = load_model(path, compile=False)
         return model
     except Exception:
