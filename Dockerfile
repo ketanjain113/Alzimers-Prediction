@@ -1,5 +1,12 @@
 FROM tensorflow/tensorflow:2.10.0
 
+# Ensure the model listens on a stable internal port and Node points to it.
+# Railway sets a container-level $PORT for the primary web process; we keep the
+# model on MODEL_PORT (5000) and let Node bind to $PORT. Setting these here
+# avoids port mismatches when Railway injects $PORT.
+ENV MODEL_PORT=5000
+ENV MODEL_API_URL=http://127.0.0.1:5000
+
 # Install Node.js 18 (required for the node_server)
 RUN apt-get update && apt-get install -y curl ca-certificates gnupg2 && \
     curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
