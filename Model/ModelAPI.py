@@ -85,6 +85,32 @@ def try_load_model(path):
             sys.modules['keras.utils'] = tf.keras.utils
             sys.modules['keras.models'] = tf.keras.models
 
+            # Provide a shim for keras.DTypePolicy (and keras.mixed_precision)
+            # so deserialization of dtype policies returns a tf.keras Policy.
+            try:
+                import types as _types
+                km = sys.modules.get('keras') or _types.ModuleType('keras')
+                def _make_dtype_policy_class():
+                    class DTypePolicyShim:
+                        def __init__(self, name):
+                            self.name = name
+                        @classmethod
+                        def from_config(cls, config):
+                            # config may be dict {'name': 'float32'}
+                            name = config.get('name') if isinstance(config, dict) else config
+                            try:
+                                return tf.keras.mixed_precision.Policy(name)
+                            except Exception:
+                                return DTypePolicyShim(name)
+                    return DTypePolicyShim
+
+                km.DTypePolicy = _make_dtype_policy_class()
+                # Also expose mixed_precision submodule mapping
+                sys.modules['keras.mixed_precision'] = tf.keras.mixed_precision
+                sys.modules['keras'] = km
+            except Exception:
+                logging.exception("Failed to insert DTypePolicy shim into keras module")
+
             logging.info("Inserted keras -> tf.keras shim modules into sys.modules for deserialization compatibility.")
 
             model = load_model(path, compile=False)
