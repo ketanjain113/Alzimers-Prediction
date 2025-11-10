@@ -1,3 +1,4 @@
+import os
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from tensorflow.keras.models import load_model
@@ -8,7 +9,23 @@ import io
 import base64
 import logging
 
-model = load_model("Model/Alzimer.keras", compile=False)
+# Determine model path (works both for local repo-root runs and if the service root is the Model/ folder)
+model_file_env = os.environ.get("MODEL_FILE")
+possible_paths = []
+if model_file_env:
+    possible_paths.append(model_file_env)
+possible_paths.extend(["Alzimer.keras", os.path.join("Model", "Alzimer.keras")])
+
+model = None
+for p in possible_paths:
+    if p and os.path.exists(p):
+        model = load_model(p, compile=False)
+        logging.info(f"Loaded model from: {p}")
+        break
+
+if model is None:
+    # Let the exception follow - clearer error at startup
+    model = load_model("Model/Alzimer.keras", compile=False)
 class_labels = ["Alzheimer's Disease: The scan shows significant brain tissue loss in memory and reasoning areas, consistent with advanced Alzheimer’s.", 
                 "Cognitively Normal: The brain structure appears healthy with no visible signs of shrinkage or abnormal patterns.", 
                 "Early Mild Cognitive Impairment (EMCI): Mild changes are visible in memory-related regions, suggesting early signs of cognitive decline.", 
@@ -107,4 +124,6 @@ def predict():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    # honor PORT env var when present (Railway sets PORT)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=True)

@@ -25,7 +25,11 @@ app.post("/api/predict", upload.single("image"), async (req, res) => {
     const form = new FormData();
     form.append("image", fs.createReadStream(req.file.path));
 
-    const response = await fetch("http://127.0.0.1:5000/predict", {
+    // MODEL_API_URL should include the /predict path if desired, otherwise we append it below
+    const modelApiBase = process.env.MODEL_API_URL || "http://127.0.0.1:5000";
+    const predictUrl = modelApiBase.endsWith("/predict") ? modelApiBase : `${modelApiBase}/predict`;
+
+    const response = await fetch(predictUrl, {
       method: "POST",
       body: form,
     });
@@ -48,4 +52,5 @@ app.post("/api/predict", upload.single("image"), async (req, res) => {
   }
 });
 
-app.listen(5001, () => console.log("🚀 Node server running on port 5001"));
+const port = process.env.PORT || 5001;
+app.listen(port, () => console.log(`🚀 Node server running on port ${port}`));
