@@ -10,11 +10,63 @@ import logging
 import os
 import os.path as osp
 
+# Helpful version info in logs
+logging.basicConfig(level=logging.INFO)
+logging.info(f"Python executable: {os.sys.executable}")
+logging.info(f"tensorflow version: {tf.__version__}")
+try:
+    # Keras version (may be part of tf)
+    import keras
+    logging.info(f"keras version: {keras.__version__}")
+except Exception:
+    logging.info("keras (standalone) not available; using tf.keras")
+
 # Resolve model path relative to this file so the script works whether started
 # from the repo root or from the Model directory.
 BASE_DIR = os.path.dirname(__file__)
 MODEL_PATH = osp.join(BASE_DIR, "Alzimer.keras")
-model = load_model(MODEL_PATH, compile=False)
+
+# Compatibility loader: some models are serialized with configs that include
+# legacy keys (for example 'batch_shape' on InputLayer). Newer Keras versions
+# may expect different config keys which causes deserialization errors like
+# "Unrecognized keyword arguments: ['batch_shape']". We attempt a normal load
+# first; on failure we monkeypatch InputLayer.from_config to accept
+# 'batch_shape' by mapping it to 'batch_input_shape', then retry.
+def try_load_model(path):
+    try:
+        return load_model(path, compile=False)
+    except Exception as e:
+        logging.exception("Initial model load failed; attempting compatibility fallback")
+
+    # Attempt monkeypatch for InputLayer.from_config to support 'batch_shape'
+    try:
+        from tensorflow.keras import layers as _layers
+        _orig_from_config = _layers.InputLayer.from_config
+
+        def _patched_from_config(cls, config, custom_objects=None):
+            if isinstance(config, dict) and 'batch_shape' in config:
+                # convert list -> tuple and rename key
+                config = dict(config)
+                config['batch_input_shape'] = tuple(config.pop('batch_shape'))
+            # call original
+            # _orig_from_config may be a function or classmethod wrapper
+            try:
+                return _orig_from_config.__func__(cls, config, custom_objects)
+            except Exception:
+                return _orig_from_config(config, custom_objects)
+
+        _layers.InputLayer.from_config = classmethod(_patched_from_config)
+        logging.info("Patched InputLayer.from_config to accept 'batch_shape' and map to 'batch_input_shape'.")
+
+        # Retry loading
+        model = load_model(path, compile=False)
+        return model
+    except Exception:
+        logging.exception("Compatibility fallback failed")
+        raise
+
+
+model = try_load_model(MODEL_PATH)
 class_labels = ["Alzheimer's Disease: The scan shows significant brain tissue loss in memory and reasoning areas, consistent with advanced Alzheimer’s.", 
                 "Cognitively Normal: The brain structure appears healthy with no visible signs of shrinkage or abnormal patterns.", 
                 "Early Mild Cognitive Impairment (EMCI): Mild changes are visible in memory-related regions, suggesting early signs of cognitive decline.", 
@@ -26,7 +78,6 @@ CORS(app)
 
 @app.route("/health", methods=["GET"])
 def health():
-    # Simple health endpoint so a proxy or load balancer can check readiness.
     return jsonify({"status": "ok", "model_path": MODEL_PATH}), 200
 
 
