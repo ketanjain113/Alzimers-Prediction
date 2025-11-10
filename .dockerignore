@@ -11,10 +11,9 @@ build/
 dist/
 .DS_Store
 *.ipynb
-*.keras
-*.h5
 uploads/
 *.log
 pip-log.txt
 *.gz
 *.zip
+
