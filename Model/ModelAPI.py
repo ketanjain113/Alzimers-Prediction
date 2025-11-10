@@ -139,282 +139,100 @@ CORS(app)
 @app.route("/health", methods=["GET"])
 def health():
     return jsonify({"status": "ok", "model_path": MODEL_PATH}), 200
-
-
 def preprocess_image_from_bytes(image_bytes, target_size=(128, 128)):
+    """Load image bytes into a numpy array resized to target_size.
+
+    Returns an HxWxC uint8 numpy array (C=3 for RGB) scaled to [0,1].
+    """
     img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-    # First try the standard loader
+    img = img.resize((int(target_size[0]), int(target_size[1])), Image.BILINEAR)
+    arr = np.asarray(img).astype('float32') / 255.0
+    return arr
+
+
+@app.route("/predict", methods=["POST"])
+def predict():
     try:
-        logging.info(f"Attempting to load model from: {path}")
-        model = load_model(path, compile=False)
-        logging.info("Model loaded successfully")
-        return model
-    except Exception:
-        logging.exception("Standard model.load_model failed; attempting targeted .keras zip recovery")
-
-    # If the file is a Keras v3 .keras zip (contains config.json + weights),
-    # try to reconstruct the model by loading and fixing the config.json.
-    try:
-        import zipfile, json, tempfile
-
-        if zipfile.is_zipfile(path):
-            logging.info("Detected .keras (zip) archive — attempting to repair config.json")
-            with zipfile.ZipFile(path, 'r') as z:
-                names = z.namelist()
-                logging.info("Archive members: %s", names)
-                if 'config.json' in names:
-                    raw = z.read('config.json')
-                    cfg_text = raw.decode('utf-8')
-                    cfg = json.loads(cfg_text)
-
-                    # Walk the config dict and replace batch_shape -> batch_input_shape
-                    def _fix_batch_shape(node):
-                        if isinstance(node, dict):
-                            if 'config' in node and isinstance(node['config'], dict):
-                                cfgd = node['config']
-                                if 'batch_shape' in cfgd:
-                                    val = cfgd.pop('batch_shape')
-                                    # convert lists to tuples
-                                    try:
-                                        cfgd['batch_input_shape'] = tuple(val)
-                                    except Exception:
-                                        cfgd['batch_input_shape'] = val
-                                # normalize dtype policy objects to simple dtype name
-                                if 'dtype' in cfgd and isinstance(cfgd['dtype'], dict):
-                                    d = cfgd['dtype']
-                                    # handle serialized DTypePolicy structures
-                                    if d.get('class_name') == 'DTypePolicy' or d.get('module', '').endswith('mixed_precision'):
-                                        try:
-                                            name = d.get('config', {}).get('name')
-                                            if name:
-                                                cfgd['dtype'] = name
-                                        except Exception:
-                                            pass
-                            for k, v in list(node.items()):
-                                _fix_batch_shape(v)
-                        elif isinstance(node, list):
-                            for it in node:
-                                _fix_batch_shape(it)
-
-                    _fix_batch_shape(cfg)
-
-                    # Try to reconstruct model from JSON and load weights
-                    try:
-                        from tensorflow.keras.models import model_from_json
-
-                        model_json = json.dumps(cfg)
-                        model = model_from_json(model_json)
-
-                        # If weights file is present inside archive, extract to temp file
-                        weights_name = None
-                        for candidate in ('model.weights.h5', 'weights.h5', 'model.h5'):
-                            if candidate in names:
-                                weights_name = candidate
-                                break
-
-                        if weights_name is not None:
-                            tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.h5')
-                            tmp.write(z.read(weights_name))
-                            tmp.flush()
-                            tmp.close()
-                            model.load_weights(tmp.name)
-                            try:
-                                os.unlink(tmp.name)
-                            except Exception:
-                                pass
-
-                        logging.info("Reconstructed model from config.json and loaded weights")
-                        return model
-                    except Exception:
-                        logging.exception("Failed to reconstruct model from fixed config.json")
-                else:
-                    logging.error("config.json not found inside .keras archive; cannot perform targeted recovery")
-    except Exception:
-        logging.exception("Error during .keras zip recovery attempt")
-
-    try:
-        import h5py, json
-        if osp.exists(path):
-            with h5py.File(path, 'r') as f:
-                model_config = None
-                if 'model_config' in f.attrs:
-                    model_config = f.attrs['model_config']
-                elif 'model_config' in f:
-                    model_config = f['model_config'][()]
-
-                if model_config is None:
-                    logging.error("No 'model_config' found inside HDF5 model file — file may be SavedModel or .keras zip.")
-                else:
-                    if isinstance(model_config, bytes):
-                        model_config = model_config.decode('utf-8')
-                    try:
-                        cfg_json = json.loads(model_config)
-                        logging.error("Model serialized config root keys: %s", list(cfg_json.keys()))
-                    except Exception:
-                        logging.exception("Failed to parse model_config JSON for diagnostics")
-    except Exception:
-        logging.info("h5py not available or HDF5 diagnostics failed")
-
-    # If we reach here, nothing worked — re-raise the original failure to show traceback
-    raise
-
-BASE_DIR = os.path.dirname(__file__)
-MODEL_PATH = osp.join(BASE_DIR, "Alzimer.keras")
-
-def try_load_model(path):
-    try:
-        return load_model(path, compile=False)
-    except Exception as e:
-        logging.exception("Initial model load failed; attempting compatibility fallback")
-
-    try:
-        import sys
-        import types
-        from tensorflow.keras import layers as _layers
-        _orig_from_config = _layers.InputLayer.from_config
-
-        def _patched_from_config(cls, config, custom_objects=None):
-            if isinstance(config, dict) and 'batch_shape' in config:
-                config = dict(config)
-                config['batch_input_shape'] = tuple(config.pop('batch_shape'))
-
-            call_attempts = []
-            call_attempts.append(lambda: _orig_from_config(cls, config, custom_objects))
-            call_attempts.append(lambda: _orig_from_config(config, custom_objects))
-            call_attempts.append(lambda: _orig_from_config(cls, config))
-            call_attempts.append(lambda: _orig_from_config(config))
-            # If the original has __func__, try that form too
-            if hasattr(_orig_from_config, '__func__'):
-                call_attempts.insert(0, lambda: _orig_from_config.__func__(cls, config, custom_objects))
-
-            last_err = None
-            for fn in call_attempts:
-                try:
-                    return fn()
-                except TypeError as te:
-                    last_err = te
-                    continue
-                except Exception:
-                    # unexpected error — re-raise immediately to preserve traceback
-                        # Keep loader simple: try a straight load. If it fails, produce safe
-                        # diagnostics (HDF5 model_config) but do not attempt complex runtime
-                        # monkeypatching — that caused more confusion than benefit.
-                        try:
-                            logging.info(f"Attempting to load model from: {path}")
-                            model = load_model(path, compile=False)
-                            logging.info("Model loaded successfully")
-                            return model
-                        except Exception as e:
-                            logging.exception("Model load failed — will attempt safe diagnostics")
-
-                            # Diagnostics: attempt to read model_config from HDF5 (.keras/.h5)
-                            try:
-                                import h5py, json
-                            except Exception:
-                                logging.info("h5py not available; cannot dump HDF5 model_config. Install h5py for diagnostics.")
-                                # Re-raise original exception to signal failure to caller
-                                raise
-
-                            if not osp.exists(path):
-                                logging.error("Model file does not exist: %s", path)
-                                raise
-
-                            try:
-                                with h5py.File(path, 'r') as f:
-                                    model_config = None
-                                    if 'model_config' in f.attrs:
-                                        model_config = f.attrs['model_config']
-                                    elif 'model_config' in f:
-                                        model_config = f['model_config'][()]
-
-                                    if model_config is None:
-                                        logging.error("No 'model_config' found inside HDF5 model file — file may be SavedModel or incompatible format")
-                                    else:
-                                        if isinstance(model_config, bytes):
-                                            model_config = model_config.decode('utf-8')
-                                        try:
-                                            cfg_json = json.loads(model_config)
-                                            logging.error("Model serialized config root keys: %s", list(cfg_json.keys()))
-
-                                            def _scan(node, path=()):
-                                                if isinstance(node, dict):
-                                                    cls = node.get('class_name') or node.get('class')
-                                                    if isinstance(cls, str) and 'Conv' in cls:
-                                                        logging.error("Found Conv layer candidate at %s: %s", '/'.join(path), node)
-                                                    cfg = node.get('config')
-                                                    if isinstance(cfg, dict) and 'dtype' in cfg:
-                                                        logging.error("Layer with dtype at %s: %s", '/'.join(path), cfg)
-                                                    for k, v in node.items():
-                                                        _scan(v, path + (str(k),))
-                                                elif isinstance(node, list):
-                                                    for i, it in enumerate(node):
-                                                        _scan(it, path + (str(i),))
-
-                                            _scan(cfg_json)
-                                        except Exception:
-                                            logging.exception("Failed to parse model_config JSON for diagnostics")
-                            except Exception:
-                                logging.exception("Error while attempting to read HDF5 model file for diagnostics")
-
-                            # Re-raise original load exception so caller sees failure
-                            raise
-            if b64.startswith("data:"):
-                b64 = b64.split(",", 1)[1]
+        # Accept multipart form file 'image' or base64 JSON {image: 'data:...'}
+        if 'image' in request.files:
+            f = request.files['image']
+            image_bytes = f.read()
+        else:
+            body = request.get_json(silent=True) or {}
+            b64 = body.get('image')
+            if not b64:
+                return jsonify({"error": "No image provided. Send multipart form-data with field 'image' or JSON with base64 'image'."}), 400
+            if isinstance(b64, str) and b64.startswith('data:'):
+                b64 = b64.split(',', 1)[1]
             image_bytes = base64.b64decode(b64)
 
-        input_shape = getattr(model, 'input_shape', None)
-        logging.info(f"Model input_shape: {input_shape}")
-
-        target_h, target_w, channels = 128, 128, 3
+        # Determine target size from model input when possible
+        target_h, target_w = 128, 128
+        channels = 3
         channels_first = False
+        try:
+            inp_shape = None
+            if hasattr(model, 'input_shape') and model.input_shape is not None:
+                inp_shape = model.input_shape
+            elif hasattr(model, 'inputs') and model.inputs:
+                inp_shape = tuple(model.inputs[0].shape.as_list())
 
-        if isinstance(input_shape, (list, tuple)) and len(input_shape) >= 3:
-            if len(input_shape) == 4:
-                _, a, b, c = input_shape
-                if a in (1, 3):
-                    channels_first = True
-                    channels = int(a)
-                    target_h = int(b) if b is not None else target_h
-                    target_w = int(c) if c is not None else target_w
-                else:
-                    target_h = int(a) if a is not None else target_h
-                    target_w = int(b) if b is not None else target_w
-                    channels = int(c) if c is not None else channels
-            elif len(input_shape) == 3:
-                _, a, b = input_shape
-                target_h = int(a) if a is not None else target_h
-                target_w = int(b) if b is not None else target_w
-                channels = 1
+            if inp_shape is not None:
+                # inp_shape examples: (None, H, W, C) or (None, C, H, W)
+                if len(inp_shape) == 4:
+                    _, a, b, c = inp_shape
+                    if a in (1, 3):
+                        channels_first = True
+                        channels = int(a)
+                        target_h = int(b) if b else target_h
+                        target_w = int(c) if c else target_w
+                    else:
+                        target_h = int(a) if a else target_h
+                        target_w = int(b) if b else target_w
+                        channels = int(c) if c else channels
+                elif len(inp_shape) == 3:
+                    _, a, b = inp_shape
+                    target_h = int(a) if a else target_h
+                    target_w = int(b) if b else target_w
 
-        mode = "RGB" if channels == 3 else "L"
+        except Exception:
+            logging.exception("Unable to infer model input shape; using defaults")
 
-        img_array = preprocess_image_from_bytes(image_bytes, target_size=(target_h, target_w))
+        img_arr = preprocess_image_from_bytes(image_bytes, target_size=(target_h, target_w))
 
-        if mode == "L":
-            if img_array.ndim == 3 and img_array.shape[2] == 3:
-                img_array = np.mean(img_array, axis=2, keepdims=True)
+        # Ensure correct channel handling
+        if channels == 1:
+            # convert to grayscale
+            if img_arr.ndim == 3 and img_arr.shape[2] == 3:
+                img_arr = np.mean(img_arr, axis=2, keepdims=True)
         else:
-            if img_array.ndim == 2:
-                img_array = np.stack([img_array]*3, axis=-1)
+            if img_arr.ndim == 2:
+                img_arr = np.stack([img_arr]*3, axis=-1)
 
-        if img_array.ndim == 2:
-            img_array = np.expand_dims(img_array, -1)
-
-        input_tensor = np.expand_dims(img_array, axis=0)  
-
+        # Create batch
+        input_tensor = np.expand_dims(img_arr, axis=0)
         if channels_first:
             input_tensor = np.transpose(input_tensor, (0, 3, 1, 2))
 
         preds = model.predict(input_tensor)
-
         preds = np.asarray(preds)
+
+        # Normalize to probabilities
         if preds.ndim == 2 and preds.shape[0] == 1:
-            probs = tf.nn.softmax(preds[0]).numpy()
+            logits = preds[0]
+        elif preds.ndim == 1:
+            logits = preds
         else:
-            probs = tf.nn.softmax(preds.reshape(-1)).numpy()
+            logits = preds.reshape(-1)
+
+        try:
+            probs = tf.nn.softmax(logits).numpy()
+        except Exception:
+            # If model already returns probabilities, try to use them directly
+            probs = logits.astype('float32')
 
         top_idx = int(np.argmax(probs))
-        confidence = float(np.max(probs))
+        confidence = float(np.max(probs)) if probs.size > 0 else 0.0
         label = class_labels[top_idx] if top_idx < len(class_labels) else str(top_idx)
 
         return jsonify({
