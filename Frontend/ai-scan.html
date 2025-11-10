@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>NeuroScan AI — AI Scan</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="header">
+    <div class="site header-inner">
+      <div class="brand">
+        <span class="logo-bubble"></span>
+        <span>NeuroScan AI</span>
+      </div>
+
+      <nav class="nav">
+        <a href="index.html">Home</a>
+        <a href="ai-scan.html" class="active">AI Scan</a>
+        <a href="game-test.html">Game Test</a>
+        <a href="insights.html">Insights</a>
+        <a href="about.html">About & Contact</a>
+      </nav>
+
+      <div class="header-right">
+        <button id="theme-toggle" aria-label="toggle theme">🌙</button>
+        <a class="btn" href="ai-scan.html">Get Started</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="site page">
+    <h2 class="page-title">AI Medical Imaging</h2>
+    <p class="page-subtitle">Use our validated AI to analyze MRI, CT, or PET images and flag early markers for review.</p>
+
+    <div class="ai-grid">
+      <div class="scan-card section">
+        <h3>Camera Scan</h3>
+        <div class="scan-camera center">
+          <div class="camera-icon">📷</div>
+          <div class="muted small">Camera access required</div>
+          <div style="margin-top:12px">
+            <button class="btn">Capture Image</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="scan-card section">
+        <h3>Upload Medical Images</h3>
+        <div class="uploader" style="margin-top:12px; text-align:center;">
+          <input id="file" type="file" accept=".jpg,.png,.jpeg,.dcm" style="display:none">
+          <label for="file" class="btn secondary">Upload MRI / CT / PET</label>
+          <div style="margin-top:10px;">
+            <img id="preview" src="" alt="" style="max-width:200px; display:none; border-radius:8px;">
+          </div>
+          <button id="analyzeBtn" class="btn" style="margin-top:15px;" disabled>Run AI Analysis</button>
+          <div id="loader" class="muted small" style="margin-top:10px; display:none;">⏳ Analyzing... please wait</div>
+        </div>
+
+        <div style="margin-top:20px" class="muted small">Accepted: .jpg .png .dcm — Max 20MB</div>
+      </div>
+    </div>
+
+    <div class="ai-result section" id="resultBox" style="display:none;">
+      <h3>AI Result</h3>
+      <p id="prediction" class="muted small" style="margin-top:8px"></p>
+      <p id="confidence" class="muted small" style="margin-top:4px"></p>
+    </div>
+  </main>
+
+  <footer class="footer site">
+    <div class="small muted">© 2025 NeuroScan AI — Empowering clinical decisions</div>
+  </footer>
+
+  <script>
+    const fileInput = document.getElementById("file");
+    const preview = document.getElementById("preview");
+    const analyzeBtn = document.getElementById("analyzeBtn");
+    const loader = document.getElementById("loader");
+    const resultBox = document.getElementById("resultBox");
+    const predictionEl = document.getElementById("prediction");
+    const confidenceEl = document.getElementById("confidence");
+
+    let selectedFile = null;
+
+    // When file selected
+    fileInput.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      selectedFile = file;
+      preview.style.display = "block";
+      preview.src = URL.createObjectURL(file);
+      analyzeBtn.disabled = false;
+      resultBox.style.display = "none";
+    });
+
+    // When "Run AI Analysis" clicked
+    analyzeBtn.addEventListener("click", async () => {
+      if (!selectedFile) return alert("Please upload an image first.");
+
+      loader.style.display = "block";
+      analyzeBtn.disabled = true;
+      resultBox.style.display = "none";
+
+      const formData = new FormData();
+      formData.append("image", selectedFile);
+
+      try {
+        const response = await fetch("/api/predict", {
+          method: "POST",
+          body: formData
+        });
+        const data = await response.json();
+
+        loader.style.display = "none";
+        resultBox.style.display = "block";
+        predictionEl.textContent = "🧩 " + (data.prediction || "No prediction found.");
+        confidenceEl.textContent = "📊 Confidence: " + ((data.confidence * 100).toFixed(2) || "0") + "%";
+      } catch (err) {
+        loader.style.display = "none";
+        resultBox.style.display = "block";
+        predictionEl.textContent = "❌ Error: Unable to analyze image.";
+        confidenceEl.textContent = "";
+      } finally {
+        analyzeBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
