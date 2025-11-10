@@ -36,15 +36,10 @@ def try_load_model(path):
 
         def _patched_from_config(cls, config, custom_objects=None):
             if isinstance(config, dict) and 'batch_shape' in config:
-                # convert list -> tuple and rename key
                 config = dict(config)
                 config['batch_input_shape'] = tuple(config.pop('batch_shape'))
 
-            # Try several calling conventions for the original from_config to
-            # handle differences across Keras/TF versions (it may be a plain
-            # function, a bound method, or a classmethod).
             call_attempts = []
-            # common variants
             call_attempts.append(lambda: _orig_from_config(cls, config, custom_objects))
             call_attempts.append(lambda: _orig_from_config(config, custom_objects))
             call_attempts.append(lambda: _orig_from_config(cls, config))
@@ -116,46 +111,37 @@ def try_load_model(path):
 
             logging.info("Inserted keras -> tf.keras shim modules into sys.modules for deserialization compatibility.")
 
-                # Patch tf.keras.mixed_precision.policy.get_policy during load so
-                # that if a string dtype slips through we create a Policy object
-                # rather than letting code attempt to access a .name attribute on
-                # a plain string.
-                try:
-                    mp = tf.keras.mixed_precision
-                    if hasattr(mp, 'policy') and hasattr(mp.policy, 'get_policy'):
-                        saved_get_policy = mp.policy.get_policy
-                        def _patched_get_policy(dtype):
-                            # If dtype is already a Policy-like object, return original
-                            try:
-                                if isinstance(dtype, str):
-                                    return tf.keras.mixed_precision.Policy(dtype)
-                                return saved_get_policy(dtype)
-                            except Exception:
-                                # defensively try to convert string->Policy
-                                if isinstance(dtype, str):
-                                    return tf.keras.mixed_precision.Policy(dtype)
-                                raise
-                        mp.policy.get_policy = _patched_get_policy
-                        logging.info("Patched tf.keras.mixed_precision.policy.get_policy to accept string dtype names.")
-                except Exception:
-                    logging.exception("Failed to patch mixed_precision.get_policy")
+            try:
+                mp = tf.keras.mixed_precision
+                if hasattr(mp, 'policy') and hasattr(mp.policy, 'get_policy'):
+                    saved_get_policy = mp.policy.get_policy
+                    def _patched_get_policy(dtype):
+                        try:
+                            if isinstance(dtype, str):
+                                return tf.keras.mixed_precision.Policy(dtype)
+                            return saved_get_policy(dtype)
+                        except Exception:
+                            if isinstance(dtype, str):
+                                return tf.keras.mixed_precision.Policy(dtype)
+                            raise
+                    mp.policy.get_policy = _patched_get_policy
+                    logging.info("Patched tf.keras.mixed_precision.policy.get_policy to accept string dtype names.")
+            except Exception:
+                logging.exception("Failed to patch mixed_precision.get_policy")
 
-                model = load_model(path, compile=False)
-                return model
+            model = load_model(path, compile=False)
+            return model
         finally:
-            # Restore any previously existing modules to avoid side-effects
             for k, v in saved_modules.items():
                 if v is None:
                     sys.modules.pop(k, None)
                 else:
                     sys.modules[k] = v
-                # Restore patched get_policy if we changed it
                 try:
                     if saved_get_policy is not None:
                         try:
                             tf.keras.mixed_precision.policy.get_policy = saved_get_policy
                         except Exception:
-                            # some TF builds expose policy via tf.keras.mixed_precision
                             try:
                                 tf.keras.mixed_precision.policy.get_policy = saved_get_policy
                             except Exception:
@@ -178,13 +164,11 @@ def try_load_model(path):
 
                         if model_config is not None:
                             try:
-                                # model_config might be bytes
                                 if isinstance(model_config, bytes):
                                     model_config = model_config.decode('utf-8')
                                 cfg_json = json.loads(model_config)
                                 # write a compact dump to logs
                                 logging.error("Model serialized config (root keys): %s", list(cfg_json.keys()))
-                                # Try to locate problematic layers (Conv2D / dtype entries)
                                 def _scan_layers(node, path=()):
                                     if isinstance(node, dict):
                                         for k, v in node.items():
@@ -209,7 +193,6 @@ def try_load_model(path):
         except Exception:
             logging.info("h5py not available or diagnostics unavailable; skipping model_config dump")
 
-        # Re-raise the original exception so caller sees the failure.
         raise
 
 
