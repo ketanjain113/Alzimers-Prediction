@@ -7,40 +7,49 @@ const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fet
 
 const app = express();
 
+// ✅ ensure uploads folder exists
 const uploadDir = path.join(__dirname, "uploads");
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
+// ✅ multer config
 const upload = multer({ dest: uploadDir });
 
-app.use(express.static(path.join(__dirname, "public")));
+// ✅ serve frontend files
+app.use(express.static(path.join(__dirname, "../Frontend")));
+
 
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.join(__dirname, '../Frontend', 'index.html'));
 });
 
+
+// ✅ image upload + forward to Python
 app.post("/api/predict", upload.single("image"), async (req, res) => {
   try {
     const form = new FormData();
     form.append("image", fs.createReadStream(req.file.path));
 
+    // forward to Flask API
     const response = await fetch("http://127.0.0.1:5000/predict", {
       method: "POST",
       body: form,
     });
 
-    const text = await response.text(); // 👈 read raw response
-    console.log("Flask raw response:", text); // 👈 log it
+    const text = await response.text(); // raw Flask response
+    console.log("Flask raw response:", text);
 
     let result;
     try {
-      result = JSON.parse(text); // try to parse JSON
+      result = JSON.parse(text); // try parsing JSON
     } catch (err) {
       throw new Error("Flask did not return valid JSON:\n" + text);
     }
 
+    // cleanup
     fs.unlinkSync(req.file.path);
+
     res.json(result);
   } catch (err) {
     console.error("❌ Error:", err.message);
@@ -48,4 +57,5 @@ app.post("/api/predict", upload.single("image"), async (req, res) => {
   }
 });
 
-app.listen(5001, () => console.log("🚀 Node server running on port 5001"));
+// ✅ Run Node on port 5001 (keep Flask on 5000)
+app.listen(5001, () => console.log("🚀 Node server running on http://localhost:5001"));
