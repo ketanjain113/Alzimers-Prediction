@@ -18,13 +18,13 @@ WORKDIR /app
 # Copy repo
 COPY . /app
 
-# Upgrade pip and install Python deps for the model
+# Upgrade pip and install Python deps for the model (fail build on error)
 RUN pip install --upgrade pip
-RUN pip install --no-cache-dir -r Model/requirements.txt || true
+RUN pip install --no-cache-dir -r Model/requirements.txt
 
-# Install Node dependencies for the Node server
+# Install Node dependencies for the Node server (fail build on error)
 WORKDIR /app/node_server
-RUN npm install --production || true
+RUN npm install --production
 
 # Expose common ports (Railway provides $PORT at runtime)
 EXPOSE 5000 5001
