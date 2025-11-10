@@ -29,6 +29,8 @@ def try_load_model(path):
         logging.exception("Initial model load failed; attempting compatibility fallback")
 
     try:
+        import sys
+        import types
         from tensorflow.keras import layers as _layers
         _orig_from_config = _layers.InputLayer.from_config
 
@@ -69,8 +71,31 @@ def try_load_model(path):
         _layers.InputLayer.from_config = classmethod(_patched_from_config)
         logging.info("Patched InputLayer.from_config to accept 'batch_shape' and map to 'batch_input_shape'.")
 
-        model = load_model(path, compile=False)
-        return model
+        # Also inject a lightweight 'keras' shim into sys.modules so configs
+        # that reference 'keras.*' (from standalone keras serialization) can
+        # resolve to the tf.keras equivalents. We do this only temporarily.
+        shim_keys = ['keras', 'keras.initializers', 'keras.regularizers', 'keras.layers', 'keras.utils', 'keras.models']
+        saved_modules = {k: sys.modules.get(k) for k in shim_keys}
+        try:
+            sys.modules['keras'] = types.ModuleType('keras')
+            # Map submodules to tf.keras modules where possible
+            sys.modules['keras.initializers'] = tf.keras.initializers
+            sys.modules['keras.regularizers'] = tf.keras.regularizers
+            sys.modules['keras.layers'] = tf.keras.layers
+            sys.modules['keras.utils'] = tf.keras.utils
+            sys.modules['keras.models'] = tf.keras.models
+
+            logging.info("Inserted keras -> tf.keras shim modules into sys.modules for deserialization compatibility.")
+
+            model = load_model(path, compile=False)
+            return model
+        finally:
+            # Restore any previously existing modules to avoid side-effects
+            for k, v in saved_modules.items():
+                if v is None:
+                    sys.modules.pop(k, None)
+                else:
+                    sys.modules[k] = v
     except Exception:
         logging.exception("Compatibility fallback failed")
         raise
