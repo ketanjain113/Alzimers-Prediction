@@ -90,24 +90,32 @@
         const data = await resp.json();
         serviceStatus.textContent = 'Model service: online';
         serviceStatus.style.backdropFilter = 'blur(10px)';
-        serviceStatus.style.border = '1px solid green';
+        serviceStatus.style.border = '3px solid green';
+        serviceStatus.style.height = 'auto';
+        serviceStatus.style.width = '200px';
+        serviceStatus.style.backgroundColor = 'rgba(0, 255, 0, 0.1)';
+        serviceStatus.style.borderRadius = '8px';
+        serviceStatus.style.padding = '8px';
         serviceStatus.style.color = 'green';
         analyzeBtn.disabled = false;
         return true;
       } catch (err) {
         serviceStatus.textContent = `Model service: offline — ${err.message}`;
         serviceStatus.style.backdropFilter = 'blur(10px)';
+        serviceStatus.style.backgroundColor = 'rgba(255, 0, 0, 0.1)';
         serviceStatus.style.border = '1px solid crimson';
+        serviceStatus.style.height = 'auto';
+        serviceStatus.style.width = '200px';
+        serviceStatus.style.borderRadius = '8px';
+        serviceStatus.style.padding = '8px';
         serviceStatus.style.color = 'crimson';
         analyzeBtn.disabled = true;
         return false;
       }
     }
 
-    // Immediately check service on page load
     checkService();
 
-    // When file selected
     fileInput.addEventListener("change", (e) => {
       const file = e.target.files[0];
       if (!file) return;
@@ -118,7 +126,6 @@
       resultBox.style.display = "none";
     });
 
-    // When "Run AI Analysis" clicked
     analyzeBtn.addEventListener("click", async () => {
       if (!selectedFile) return alert("Please upload an image first.");
 
@@ -139,6 +146,7 @@
         loader.style.display = "none";
         resultBox.style.display = "block";
         predictionEl.textContent = "🧩 " + (data.prediction || "No prediction found.");
+        predictionEl.style.fontSize = "30px";
         confidenceEl.textContent = "📊 Confidence: " + ((data.confidence * 100).toFixed(2) || "0") + "%";
       } catch (err) {
         loader.style.display = "none";
