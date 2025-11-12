@@ -62,8 +62,7 @@ pip install -r requirements.txt
 
 ## 📊 Model Insights
 
-The model uses deep convolutional neural networks (CNNs) trained on MRI datasets,
-and explainability is achieved through Grad-CAM or similar visualization techniques to show highlighted brain regions relevant to prediction.
+Trained on labeled MRI scans (Alzheimer's vs control) using TensorFlow/Keras with transfer learning from medical imaging backbone
 
 --- 
 
