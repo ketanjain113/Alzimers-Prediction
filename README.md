@@ -81,6 +81,6 @@ If you’d like to improve model accuracy, UI/UX, or documentation:
 
 ## 💬 Contact
 
-Author: [Ketan Jain](https://github.com/ketanjain113), [Kavish Jain](https://github.com/kavish200), [Harsh Malviya](https://github.com/harshfly), [Sarthak]()
+Author: [Ketan Jain](https://github.com/ketanjain113), [Kavish Jain](https://github.com/kavish200), [Harsh Malviya](https://github.com/harshfly), [Sarthak Mahajan]()
 
 For questions or collaboration, please open an issue or contact via GitHub.
