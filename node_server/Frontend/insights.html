@@ -62,7 +62,7 @@
           <div id="predictionText" style="font-weight:600;margin-top:4px;font-size:14px;">—</div>
         </div>
         <div>
-          <div class="muted small">Risk Level</div>
+          <div class="muted small">Confidence</div>
           <div id="riskText" class="green" style="font-weight:700;margin-top:4px;font-size:20px;">—</div>
         </div>
         <div>
@@ -74,7 +74,7 @@
 
     <!-- ✅ Chart -->
     <div id="chartSection" class="chart section" style="margin-top:18px;display:none;">
-      <h4>Risk Level History Over Time</h4>
+      <h4>Latest Scan - Prediction Probabilities</h4>
       <img id="chartImg" src="" alt="chart" style="width:100%;max-width:100%;height:auto;">
     </div>
 
@@ -87,7 +87,7 @@
             <tr style="border-bottom:2px solid #516cc4;">
               <th style="padding:12px;text-align:left;">Date</th>
               <th style="padding:12px;text-align:left;">Prediction</th>
-              <th style="padding:12px;text-align:center;">Risk %</th>
+              <th style="padding:12px;text-align:center;">Confidence %</th>
             </tr>
           </thead>
           <tbody id="historyTableBody">
@@ -167,56 +167,54 @@
           day: 'numeric' 
         });
 
-        // Build chart with timeline data
-        const labels = data.timeline.map(t => t.date);
-        const riskData = data.timeline.map(t => t.risk);
-        
+        // Build bar chart for 4-class probabilities from latest scan
+        const chartLabels = [
+          "Alzheimer's Disease",
+          "Cognitively Normal",
+          "Early MCI",
+          "Late MCI"
+        ];
+        const probabilities = (latest.chartData && latest.chartData.length) ? latest.chartData : [0,0,0,0];
         const chartUrl = `https://quickchart.io/chart?bkg=white&c=${encodeURIComponent(JSON.stringify({
-          type: 'line',
+          type: 'bar',
           data: {
-            labels: labels,
+            labels: chartLabels,
             datasets: [{
-              label: 'Risk Level (%)',
-              data: riskData,
-              fill: false,
-              borderColor: 'rgb(81, 108, 196)',
-              backgroundColor: 'rgb(81, 108, 196)',
-              tension: 0.1,
-              pointRadius: 5,
-              pointHoverRadius: 7
+              label: 'Prediction Probability (%)',
+              data: probabilities,
+              backgroundColor: [
+                'rgba(255, 99, 132, 0.7)',
+                'rgba(75, 192, 192, 0.7)',
+                'rgba(255, 206, 86, 0.7)',
+                'rgba(153, 102, 255, 0.7)'
+              ],
+              borderColor: [
+                'rgba(255, 99, 132, 1)',
+                'rgba(75, 192, 192, 1)',
+                'rgba(255, 206, 86, 1)',
+                'rgba(153, 102, 255, 1)'
+              ],
+              borderWidth: 2
             }]
           },
           options: {
             responsive: true,
             plugins: {
-              legend: {
-                display: true,
-                position: 'top'
-              },
-              title: {
-                display: true,
-                text: 'Risk Level Over Time'
-              }
+              legend: { display: false },
+              title: { display: true, text: 'Classification Probabilities' }
             },
             scales: {
               y: {
                 beginAtZero: true,
                 max: 100,
-                title: {
-                  display: true,
-                  text: 'Risk Percentage'
-                }
+                title: { display: true, text: 'Probability (%)' }
               },
               x: {
-                title: {
-                  display: true,
-                  text: 'Scan Date'
-                }
+                title: { display: true, text: 'Diagnosis Category' }
               }
             }
           }
         }))}`;
-        
         chartImg.src = chartUrl;
 
         // Populate history table
