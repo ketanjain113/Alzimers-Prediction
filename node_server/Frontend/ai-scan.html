@@ -47,6 +47,19 @@
         <h4>Upload Medical Images</h4>
         <div class="uploader" style="margin-top:12px; text-align:center;">
         <div id="serviceStatus" class="muted small" style="margin-bottom:8px;">Checking model service…</div>
+          
+          <!-- Patient Name Input -->
+          <div style="margin-bottom:16px;">
+            <label for="patientName" style="display:block; margin-bottom:6px; font-weight:500;">Patient Name</label>
+            <input 
+              id="patientName" 
+              type="text" 
+              placeholder="Enter patient name" 
+              style="padding:10px; border-radius:8px; border:1px solid #444; background:#1a1a1a; color:#fff; width:250px; font-size:14px;"
+              required
+            >
+          </div>
+
           <input id="file" type="file" accept=".jpg,.png,.jpeg,.dcm" style="display:none">
           <label for="file" class="btn secondary">Upload MRI / CT / PET</label>
           <div style="margin-top:10px;">
@@ -62,6 +75,7 @@
 
     <div class="ai-result section" id="resultBox" style="display:none; margin-top: 40px;">
       <h3>AI Result</h3>
+      <p id="patientInfo" class="muted small" style="margin-top:8px; font-weight:bold;"></p>
       <p id="prediction" class="muted small" style="margin-top:8px"></p>
       <p id="confidence" class="muted small" style="margin-top:4px"></p>
     </div>
@@ -79,6 +93,7 @@
     const resultBox = document.getElementById("resultBox");
     const predictionEl = document.getElementById("prediction");
     const confidenceEl = document.getElementById("confidence");
+    const patientInfoEl = document.getElementById("patientInfo");
   const serviceStatus = document.getElementById("serviceStatus");
 
     let selectedFile = null;
@@ -129,12 +144,16 @@
     analyzeBtn.addEventListener("click", async () => {
       if (!selectedFile) return alert("Please upload an image first.");
 
+      const patientName = document.getElementById("patientName").value.trim();
+      if (!patientName) return alert("Please enter the patient name.");
+
       loader.style.display = "block";
       analyzeBtn.disabled = true;
       resultBox.style.display = "none";
 
       const formData = new FormData();
       formData.append("image", selectedFile);
+      formData.append("name", patientName);
 
       try {
         const response = await fetch("/api/predict", {
@@ -145,6 +164,7 @@
 
         loader.style.display = "none";
         resultBox.style.display = "block";
+        patientInfoEl.textContent = "👤 Patient: " + patientName;
         predictionEl.textContent = "🧩 " + (data.prediction || "No prediction found.");
         predictionEl.style.fontSize = "30px";
         confidenceEl.textContent = "📊 Confidence: " + ((data.confidence * 100).toFixed(2) || "0") + "%";
