@@ -167,50 +167,42 @@
           day: 'numeric' 
         });
 
-        // Build progressive class-over-time line chart
-        const classLabels = [
-          "Alzheimer's Disease",
-          "Cognitively Normal",
-          "Early MCI",
-          "Late MCI"
-        ];
-        const timelinePoints = data.timeline
-          .filter(t => t.classIndex !== undefined && t.classIndex !== null && t.classIndex >= 0)
-          .map(t => ({ x: t.date, y: Math.max(0, Math.min(3, t.classIndex)) }));
+        // Build stepped line chart with y-axis class names
+        const classNames = ["Alzheimer's Disease","Cognitively Normal","Early MCI","Late MCI"];
+        const lineLabels = data.timeline.map(t => t.date);
+        const lineValues = data.timeline.map(t => (t.classIndex !== undefined && t.classIndex >= 0) ? t.classIndex : null);
 
         const chartUrl = `https://quickchart.io/chart?bkg=white&c=${encodeURIComponent(JSON.stringify({
           type: 'line',
           data: {
+            labels: lineLabels,
             datasets: [{
               label: 'Predicted Class',
-              data: timelinePoints,
-              parsing: false,
+              data: lineValues,
               spanGaps: true,
-              borderColor: 'rgb(81, 108, 196)',
-              backgroundColor: 'rgba(81, 108, 196, 0.2)',
+              borderColor: 'rgb(81,108,196)',
+              backgroundColor: 'rgba(81,108,196,0.25)',
               pointRadius: 5,
               pointHoverRadius: 7,
-              tension: 0,
               stepped: true,
-              showLine: true
+              tension: 0
             }]
           },
           options: {
             responsive: true,
             plugins: {
               legend: { display: true, position: 'top' },
-              title: { display: true, text: 'Predicted Class Over Time' }
+              title: { display: true, text: 'Predicted Class Progression Over Time' },
+              tooltip: { callbacks: { label: function(ctx){ const idx = ctx.parsed.y; return classNames[idx] || 'Unknown'; } } }
             },
             scales: {
-              x: {
-                type: 'category',
-                title: { display: true, text: 'Scan Date' }
-              },
               y: {
-                type: 'category',
-                labels: classLabels,
-                title: { display: true, text: 'Predicted Class' }
-              }
+                min: 0,
+                max: 3,
+                ticks: { stepSize: 1, callback: function(value){ return classNames[value] || ''; } },
+                title: { display: true, text: 'Class' }
+              },
+              x: { title: { display: true, text: 'Scan Date' } }
             }
           }
         }))}`;
