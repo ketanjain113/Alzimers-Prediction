@@ -43,25 +43,68 @@
 
       <!-- ✅ Dynamic Stats -->
       <div class="stat section">
-        <h4>AI Prediction</h4>
-        <div id="predictionText" class="green" style="font-weight:700;margin-top:8px">—</div>
+        <h4>Total Scans</h4>
+        <div id="totalScansText" class="green" style="font-weight:700;margin-top:8px;font-size:32px;">—</div>
       </div>
 
       <div class="stat section">
-        <h4>Risk Level</h4>
-        <div id="riskText" class="green" style="font-weight:700;margin-top:8px">— <span class="muted small">—</span></div>
+        <h4>Patient Name</h4>
+        <div id="patientNameText" style="font-weight:700;margin-top:8px;font-size:20px;">—</div>
       </div>
+    </div>
 
-      <div class="stat section">
-        <h4>Last Test Date</h4>
-        <div style="margin-top:8px"><strong id="lastTestText">—</strong></div>
+    <!-- ✅ Patient Info Card -->
+    <div id="patientInfoCard" class="section" style="margin-top:18px;display:none;">
+      <h4>Latest Scan Results</h4>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-top:12px;">
+        <div>
+          <div class="muted small">Prediction</div>
+          <div id="predictionText" style="font-weight:600;margin-top:4px;font-size:14px;">—</div>
+        </div>
+        <div>
+          <div class="muted small">Risk Level</div>
+          <div id="riskText" class="green" style="font-weight:700;margin-top:4px;font-size:20px;">—</div>
+        </div>
+        <div>
+          <div class="muted small">Confidence</div>
+          <div id="confidenceText" style="font-weight:600;margin-top:4px;font-size:20px;">—</div>
+        </div>
+        <div>
+          <div class="muted small">Last Scan Date</div>
+          <div id="lastTestText" style="font-weight:600;margin-top:4px;">—</div>
+        </div>
       </div>
     </div>
 
     <!-- ✅ Chart -->
-    <div class="chart section" style="margin-top:18px">
-      <h4>Diagnosis History</h4>
-      <img id="chartImg" src="https://quickchart.io/chart?c={type:'line',data:{labels:['Jan','Mar','May','Jul','Sep','Nov'],datasets:[{data:[0,0,0,0,0,0],fill:false}]},options:{plugins:{legend:{display:false}}}}" alt="chart">
+    <div id="chartSection" class="chart section" style="margin-top:18px;display:none;">
+      <h4>Risk Level History Over Time</h4>
+      <img id="chartImg" src="" alt="chart" style="width:100%;max-width:100%;height:auto;">
+    </div>
+
+    <!-- ✅ Scan History Table -->
+    <div id="historySection" class="section" style="margin-top:18px;display:none;">
+      <h4>Complete Scan History</h4>
+      <div style="overflow-x:auto;margin-top:12px;">
+        <table id="historyTable" style="width:100%;border-collapse:collapse;">
+          <thead>
+            <tr style="border-bottom:2px solid #516cc4;">
+              <th style="padding:12px;text-align:left;">Date</th>
+              <th style="padding:12px;text-align:left;">Prediction</th>
+              <th style="padding:12px;text-align:center;">Risk %</th>
+              <th style="padding:12px;text-align:center;">Confidence %</th>
+            </tr>
+          </thead>
+          <tbody id="historyTableBody">
+            <!-- Will be populated dynamically -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ✅ No Data Message -->
+    <div id="noDataMessage" class="section" style="margin-top:18px;text-align:center;padding:40px;display:none;">
+      <p class="muted">No patient data found. Please search for a patient name.</p>
     </div>
   </main>
 
@@ -71,32 +114,156 @@
 
   <!-- ✅ JavaScript to Connect Backend -->
   <script>
-    document.getElementById("searchBtn").addEventListener("click", async () => {
-      const name = document.getElementById("patientInput").value.trim();
+    const searchBtn = document.getElementById("searchBtn");
+    const patientInput = document.getElementById("patientInput");
+    
+    // Elements
+    const totalScansText = document.getElementById("totalScansText");
+    const patientNameText = document.getElementById("patientNameText");
+    const predictionText = document.getElementById("predictionText");
+    const riskText = document.getElementById("riskText");
+    const confidenceText = document.getElementById("confidenceText");
+    const lastTestText = document.getElementById("lastTestText");
+    const chartImg = document.getElementById("chartImg");
+    const historyTableBody = document.getElementById("historyTableBody");
+    
+    // Sections
+    const patientInfoCard = document.getElementById("patientInfoCard");
+    const chartSection = document.getElementById("chartSection");
+    const historySection = document.getElementById("historySection");
+    const noDataMessage = document.getElementById("noDataMessage");
+
+    searchBtn.addEventListener("click", async () => {
+      const name = patientInput.value.trim();
       if (!name) return alert("Please enter a patient name!");
 
       try {
-        const res = await fetch(`http://localhost:5001/api/patient/${name}`);
+        // Show loading state
+        searchBtn.textContent = "Searching...";
+        searchBtn.disabled = true;
+
+        const res = await fetch(`/api/patient/${name}/history`);
         const data = await res.json();
 
-        if (data.error) {
-          alert(data.error);
+        if (res.status === 404 || data.message) {
+          // No data found
+          hideAllSections();
+          noDataMessage.style.display = "block";
+          noDataMessage.querySelector("p").textContent = data.message || "No records found for this patient.";
           return;
         }
 
-        // Update dashboard
-        document.getElementById("predictionText").textContent = data.prediction;
-        document.getElementById("riskText").innerHTML = `${data.risk}% <span class="muted small">${data.change > 0 ? "↑" : "↓"}${Math.abs(data.change)}%</span>`;
-        document.getElementById("lastTestText").textContent = data.lastTest;
+        // Hide no data message and show sections
+        noDataMessage.style.display = "none";
+        patientInfoCard.style.display = "block";
+        chartSection.style.display = "block";
+        historySection.style.display = "block";
 
-        // Update chart dynamically
-        const chartUrl = `https://quickchart.io/chart?c={type:'line',data:{labels:['Jan','Mar','May','Jul','Sep','Nov'],datasets:[{data:[${data.chartData.join(",")}],fill:false,borderColor:'rgb(81,108,196)'}]},options:{plugins:{legend:{display:false}}}}`;
-        document.getElementById("chartImg").src = chartUrl;
+        // Update stats
+        totalScansText.textContent = data.totalScans;
+        patientNameText.textContent = data.name.charAt(0).toUpperCase() + data.name.slice(1);
+
+        // Update latest scan info
+        const latest = data.latestScan;
+        predictionText.textContent = latest.prediction;
+        riskText.textContent = `${latest.risk}%`;
+        confidenceText.textContent = `${Math.round(latest.confidence * 100)}%`;
+        lastTestText.textContent = new Date(latest.date).toLocaleDateString('en-US', { 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric' 
+        });
+
+        // Build chart with timeline data
+        const labels = data.timeline.map(t => t.date);
+        const riskData = data.timeline.map(t => t.risk);
+        
+        const chartUrl = `https://quickchart.io/chart?bkg=white&c=${encodeURIComponent(JSON.stringify({
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [{
+              label: 'Risk Level (%)',
+              data: riskData,
+              fill: false,
+              borderColor: 'rgb(81, 108, 196)',
+              backgroundColor: 'rgb(81, 108, 196)',
+              tension: 0.1,
+              pointRadius: 5,
+              pointHoverRadius: 7
+            }]
+          },
+          options: {
+            responsive: true,
+            plugins: {
+              legend: {
+                display: true,
+                position: 'top'
+              },
+              title: {
+                display: true,
+                text: 'Risk Level Over Time'
+              }
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                max: 100,
+                title: {
+                  display: true,
+                  text: 'Risk Percentage'
+                }
+              },
+              x: {
+                title: {
+                  display: true,
+                  text: 'Scan Date'
+                }
+              }
+            }
+          }
+        }))}`;
+        
+        chartImg.src = chartUrl;
+
+        // Populate history table
+        historyTableBody.innerHTML = "";
+        data.allRecords.reverse().forEach(record => {
+          const row = document.createElement("tr");
+          row.style.borderBottom = "1px solid #333";
+          row.innerHTML = `
+            <td style="padding:12px;">${new Date(record.scanDate).toLocaleDateString('en-US', { 
+              year: 'numeric', 
+              month: 'short', 
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            })}</td>
+            <td style="padding:12px;">${record.prediction.substring(0, 50)}...</td>
+            <td style="padding:12px;text-align:center;font-weight:600;">${record.risk}%</td>
+            <td style="padding:12px;text-align:center;">${Math.round(record.confidence * 100)}%</td>
+          `;
+          historyTableBody.appendChild(row);
+        });
 
       } catch (err) {
         console.error(err);
-        alert("Error fetching patient data. Please check backend connection.");
+        alert("Error fetching patient data. Please check your connection.");
+      } finally {
+        searchBtn.textContent = "Search";
+        searchBtn.disabled = false;
       }
+    });
+
+    function hideAllSections() {
+      patientInfoCard.style.display = "none";
+      chartSection.style.display = "none";
+      historySection.style.display = "none";
+    }
+
+    // Allow search on Enter key
+    patientInput.addEventListener("keypress", (e) => {
+      if (e.key === "Enter") searchBtn.click();
     });
   </script>
 </body>

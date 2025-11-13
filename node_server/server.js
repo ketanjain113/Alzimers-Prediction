@@ -108,6 +108,8 @@ app.post("/api/predict", upload.single("image"), async (req, res) => {
       prediction: result.prediction || "Unknown",
       risk: risk,
       change: change,
+      confidence: confidence,
+      scanDate: new Date(),
       lastTest: new Date().toISOString().slice(0, 10),
       chartData: chartData,
     });
@@ -156,12 +158,58 @@ app.get("/api/health", async (req, res) => {
   }
 });
 
-// ✅ Fetch a Patient by Name
-// Fetch a patient by name
+// ✅ Fetch ALL records for a patient by name (for insights/history)
+app.get("/api/patient/:name/history", async (req, res) => {
+  try {
+    const name = req.params.name.trim();
+    // Find all records for this patient, sorted by date (newest first)
+    const records = await Patient.find({ name: new RegExp(`^${name}$`, "i") })
+      .sort({ scanDate: -1 });
+    
+    if (!records || records.length === 0) {
+      return res.status(404).json({ message: "No records found for this patient" });
+    }
+
+    // Get the latest record for current stats
+    const latestRecord = records[0];
+
+    // Prepare timeline data for graphing
+    const timeline = records.reverse().map(record => ({
+      date: new Date(record.scanDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      risk: record.risk,
+      prediction: record.prediction,
+      confidence: record.confidence,
+      fullDate: record.scanDate
+    }));
+
+    res.json({
+      name: latestRecord.name,
+      totalScans: records.length,
+      latestScan: {
+        prediction: latestRecord.prediction,
+        risk: latestRecord.risk,
+        change: latestRecord.change,
+        confidence: latestRecord.confidence,
+        date: latestRecord.scanDate,
+        lastTest: latestRecord.lastTest
+      },
+      timeline: timeline,
+      allRecords: records
+    });
+  } catch (err) {
+    console.error("Error fetching patient history:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// ✅ Fetch a Patient by Name (single/latest record)
 app.get("/api/patient/:name", async (req, res) => {
   try {
     const name = req.params.name.trim();
-    const patient = await Patient.findOne({ name: new RegExp(`^${name}$`, "i") }); // case-insensitive
+    // Find the most recent record for this patient
+    const patient = await Patient.findOne({ name: new RegExp(`^${name}$`, "i") })
+      .sort({ scanDate: -1 });
+    
     if (!patient) return res.status(404).json({ message: "Patient not found" });
     res.json(patient);
   } catch (err) {
