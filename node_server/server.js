@@ -114,8 +114,13 @@ app.post("/api/predict", upload.single("image"), async (req, res) => {
       chartData: chartData,
     });
 
-    await newPatient.save();
-    console.log("✅ Saved new patient:", newPatient);
+    try {
+      await newPatient.save();
+      console.log("✅ Saved new patient scan:", newPatient);
+    } catch (saveErr) {
+      console.error("⚠️ MongoDB save failed (continuing anyway):", saveErr.message);
+      // Continue even if save fails - still return prediction to user
+    }
 
     // Cleanup temp file
     fs.unlinkSync(req.file.path);
