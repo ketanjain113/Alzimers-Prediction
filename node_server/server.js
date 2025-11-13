@@ -82,15 +82,34 @@ app.post("/api/predict", upload.single("image"), async (req, res) => {
       throw new Error("Flask did not return valid JSON:\n" + text);
     }
 
+    // Check if Flask returned an error
+    if (result.error) {
+      throw new Error(`Model API error: ${result.error}`);
+    }
+
+    // 🧠 Map Flask response to our format
+    const confidence = result.confidence || 0;
+    const risk = Math.round(confidence * 100); // Convert confidence to risk percentage
+    const probabilities = result.probabilities || [];
+    
+    // Calculate change based on class probabilities (simplified)
+    const change = probabilities.length >= 2 ? 
+      Math.round((probabilities[0] - probabilities[1]) * 100) : 0;
+    
+    // Generate chart data from probabilities
+    const chartData = probabilities.length > 0 ? 
+      probabilities.map(p => Math.round(p * 100)) : 
+      [40, 60, 75, 80, 90];
+
     // 🧠 Save prediction result to MongoDB
     const patientName = req.body.name || "unknown";
     const newPatient = new Patient({
       name: patientName.toLowerCase(),
       prediction: result.prediction || "Unknown",
-      risk: result.risk || 0,
-      change: result.change || 0,
+      risk: risk,
+      change: change,
       lastTest: new Date().toISOString().slice(0, 10),
-      chartData: result.chartData || [40, 60, 75, 80, 90],
+      chartData: chartData,
     });
 
     await newPatient.save();
@@ -99,7 +118,16 @@ app.post("/api/predict", upload.single("image"), async (req, res) => {
     // Cleanup temp file
     fs.unlinkSync(req.file.path);
 
-    res.json({ message: "Prediction completed and saved!", result, patient: newPatient });
+    // Return formatted response for frontend
+    res.json({ 
+      message: "Prediction completed and saved!", 
+      prediction: result.prediction,
+      confidence: confidence,
+      risk: risk,
+      change: change,
+      chartData: chartData,
+      patient: newPatient 
+    });
   } catch (err) {
     console.error("❌ Error:", err.message);
     res.status(500).json({ error: err.message });
