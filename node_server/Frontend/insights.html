@@ -74,9 +74,8 @@
 
     <!-- ✅ Chart -->
     <div id="chartSection" class="chart section" style="margin-top:18px;display:none;">
-      <h4>Predicted Class Spikes Over Time</h4>
+      <h4>Predicted Class Progression Over Time</h4>
       <img id="chartImg" src="" alt="chart" style="width:100%;max-width:100%;height:auto;">
-      <div class="small muted" style="margin-top:8px">Mapping: 25 = Alzheimer's, 50 = Normal, 75 = EMCI, 100 = LMCI</div>
     </div>
 
     <!-- ✅ Scan History Table -->
@@ -168,43 +167,42 @@
           day: 'numeric' 
         });
 
-        // Build spike (lollipop-style) bar chart per prediction date
-        const dateLabels = data.timeline.map(t => t.date);
-        const classIndexToSpike = [25, 50, 75, 100];
-        const spikeValues = data.timeline.map(t => (t.classIndex !== undefined && t.classIndex >= 0) ? classIndexToSpike[t.classIndex] : null);
+        // Build stepped line chart with y-axis class names
+        const classNames = ["Alzheimer's Disease","Cognitively Normal","Early MCI","Late MCI"];
+        const lineLabels = data.timeline.map(t => t.date);
+        const lineValues = data.timeline.map(t => (t.classIndex !== undefined && t.classIndex >= 0) ? t.classIndex : null);
 
         const chartUrl = `https://quickchart.io/chart?bkg=white&c=${encodeURIComponent(JSON.stringify({
-          type: 'bar',
+          type: 'line',
           data: {
-            labels: dateLabels,
+            labels: lineLabels,
             datasets: [{
-              label: 'Predicted Class (spike)',
-              data: spikeValues,
-              backgroundColor: 'rgba(81, 108, 196, 0.6)',
-              borderColor: 'rgb(81, 108, 196)',
-              borderWidth: 2,
-              barThickness: 6,
-              maxBarThickness: 8,
-              categoryPercentage: 0.8,
-              barPercentage: 0.3
+              label: 'Predicted Class',
+              data: lineValues,
+              spanGaps: true,
+              borderColor: 'rgb(81,108,196)',
+              backgroundColor: 'rgba(81,108,196,0.25)',
+              pointRadius: 5,
+              pointHoverRadius: 7,
+              stepped: true,
+              tension: 0
             }]
           },
           options: {
             responsive: true,
             plugins: {
               legend: { display: true, position: 'top' },
-              title: { display: true, text: 'Predicted Class Spikes Over Time' }
+              title: { display: true, text: 'Predicted Class Progression Over Time' },
+              tooltip: { callbacks: { label: function(ctx){ const idx = ctx.parsed.y; return classNames[idx] || 'Unknown'; } } }
             },
             scales: {
               y: {
-                beginAtZero: true,
-                max: 100,
-                ticks: { stepSize: 25 },
-                title: { display: true, text: 'Class Level (25=AD, 50=Normal, 75=EMCI, 100=LMCI)' }
+                min: 0,
+                max: 3,
+                ticks: { stepSize: 1, callback: function(value){ return classNames[value] || ''; } },
+                title: { display: true, text: 'Class' }
               },
-              x: {
-                title: { display: true, text: 'Scan Date' }
-              }
+              x: { title: { display: true, text: 'Scan Date' } }
             }
           }
         }))}`;
