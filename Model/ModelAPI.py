@@ -235,6 +235,11 @@ def predict():
         confidence = float(np.max(probs)) if probs.size > 0 else 0.0
         label = class_labels[top_idx] if top_idx < len(class_labels) else str(top_idx)
 
+        try:
+            logging.info("predict(): top_idx=%s, confidence=%.4f, probs=%s", top_idx, confidence, np.array2string(probs, precision=4))
+        except Exception:
+            pass
+
         return jsonify({
             "prediction": label,
             "confidence": round(confidence, 6),

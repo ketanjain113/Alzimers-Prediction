@@ -86,6 +86,17 @@ app.post("/api/predict", upload.single("image"), async (req, res) => {
     const confidence = result.confidence || 0;
     const risk = Math.round(confidence * 100);
     const probabilities = result.probabilities || [];
+
+    // Debug log to verify model outputs per request
+    try {
+      console.log("Model summary → prediction:", result.prediction);
+      console.log("Model summary → confidence:", confidence);
+      if (Array.isArray(probabilities)) {
+        console.log("Model summary → probabilities (len=", probabilities.length, "):", probabilities);
+      } else {
+        console.log("Model summary → probabilities: not an array", probabilities);
+      }
+    } catch (e) {}
     
     const change = probabilities.length >= 2 ? 
       Math.round((probabilities[0] - probabilities[1]) * 100) : 0;

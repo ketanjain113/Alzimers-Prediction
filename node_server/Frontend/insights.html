@@ -160,7 +160,7 @@
         // Update latest scan info
         const latest = data.latestScan;
         predictionText.textContent = latest.prediction;
-        riskText.textContent = `${latest.risk}%`;
+        riskText.textContent = `${(Number(latest.confidence || 0) * 100).toFixed(2)}%`;
         lastTestText.textContent = new Date(latest.date).toLocaleDateString('en-US', { 
           year: 'numeric', 
           month: 'long', 
@@ -230,7 +230,7 @@
               minute: '2-digit'
             })}</td>
             <td style="padding:12px;">${record.prediction.substring(0, 50)}...</td>
-            <td style="padding:12px;text-align:center;font-weight:600;">${record.risk}%</td>
+            <td style="padding:12px;text-align:center;font-weight:600;">${(Number(record.confidence || 0) * 100).toFixed(2)}%</td>
           `;
           historyTableBody.appendChild(row);
         });
