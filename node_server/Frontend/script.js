@@ -1,44 +1,68 @@
-/* script.js - unified behavior: theme + active nav highlight + optional small UI helpers */
+// =============================
+// 🧠 ALZHEIMER PREDICTION LOGIC
+// =============================
 
-(function(){
-  // THEME: toggle & persist
-  const btn = document.querySelectorAll('#theme-toggle');
-  const body = document.body;
-  const saved = localStorage.getItem('ns_theme') || null;
-  if(saved === 'light') body.classList.add('light');
+document.addEventListener("DOMContentLoaded", () => {
+  const form = document.getElementById("predict-form");
+  const fileInput = document.getElementById("image");
+  const nameInput = document.getElementById("name");
+  const resultBox = document.getElementById("result");
 
-  function updateToggleText(el){
-    if(!el) return;
-    el.textContent = body.classList.contains('light') ? '☀️' : '🌙';
-  }
+  // ✅ If page doesn’t have the form (e.g., home/about), skip setup
+  if (!form) return;
 
-  // set initial text on all toggles
-  document.querySelectorAll('#theme-toggle').forEach(updateToggleText);
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
 
-  document.addEventListener('click', e=>{
-    if(e.target && e.target.id === 'theme-toggle'){
-      body.classList.toggle('light');
-      const mode = body.classList.contains('light') ? 'light' : 'dark';
-      localStorage.setItem('ns_theme', mode);
-      document.querySelectorAll('#theme-toggle').forEach(updateToggleText);
+    const file = fileInput?.files[0];
+    const name = nameInput?.value.trim();
+
+    if (!file || !name) {
+      alert("⚠️ Please enter your name and upload an MRI image!");
+      return;
+    }
+
+    // Prepare multipart form data
+    const formData = new FormData();
+    formData.append("image", file);
+    formData.append("name", name);
+
+    try {
+      resultBox.innerHTML = "⏳ Analyzing MRI scan... please wait.";
+
+      const response = await fetch("/api/predict", {
+        method: "POST",
+        body: formData,
+      });
+
+      const text = await response.text(); // handle non-JSON edge cases
+      let data;
+
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error("Invalid JSON from server: " + text);
+      }
+
+      if (!response.ok) {
+        throw new Error(data.error || "Server returned an error");
+      }
+
+      // ✅ Display prediction result
+      resultBox.innerHTML = `
+        <h3>🧠 Prediction Result</h3>
+        <p><b>Patient:</b> ${name}</p>
+        <p><b>Prediction:</b> ${data.prediction}</p>
+        <p><b>Confidence:</b> ${(data.confidence * 100).toFixed(2)}%</p>
+        <p><b>Risk Level:</b> ${data.risk || 0}%</p>
+        <p><b>Status:</b> ${data.change >= 0 ? "📈 Getting Worse" : "📉 Improving"}</p>
+      `;
+
+    } catch (err) {
+      console.error("❌ Prediction Error:", err);
+      resultBox.innerHTML = `
+        <p style="color:red;">❌ ${err.message || "Failed to connect to server."}</p>
+      `;
     }
   });
-
-  // NAV: active link based on path
-  const links = document.querySelectorAll('.nav a');
-  const path = location.pathname.split('/').pop() || 'index.html';
-  links.forEach(a=>{
-    const href = a.getAttribute('href') || '';
-    if(href === path || (href === 'index.html' && path === '')) {
-      a.classList.add('active');
-    } else {
-      a.classList.remove('active');
-    }
-  });
-
-  // small: smooth anchor scrolling if needed
-  document.querySelectorAll('a[href^="#"]').forEach(a=>{
-    a.addEventListener('click', e=>{ e.preventDefault(); document.querySelector(a.getAttribute('href')).scrollIntoView({behavior:'smooth'}); });
-  });
-
-})();
+});

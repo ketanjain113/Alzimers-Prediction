@@ -31,32 +31,37 @@
     <h2 class="page-title">Dashboard Insights</h2>
     <p class="page-subtitle">Visualize history from scans and tests — track risk level, scans, and changes over time.</p>
 
-    
+    <!-- ✅ Search Section -->
     <div class="cards-row">
       <div class="stat section" style="display:flex;flex-direction:column;gap:8px;">
         <h4>Search by Patient</h4>
         <div style="display:flex;gap:8px;align-items:center;">
-          <input type="text" placeholder="Search..." aria-label="Search Patient ID" style="padding:8px 10px;border:1px solid #516cc4;border-radius:6px;min-width:100px;flex:1;font-size:14px;">
-          <button class="btn" style="padding:8px 14px;border-radius:6px;">Search</button>
+          <input id="patientInput" type="text" placeholder="Enter patient name..." aria-label="Search Patient ID" style="padding:8px 10px;border:1px solid #516cc4;border-radius:6px;min-width:100px;flex:1;font-size:14px;">
+          <button id="searchBtn" class="btn" style="padding:8px 14px;border-radius:6px;">Search</button>
         </div>
       </div>
+
+      <!-- ✅ Dynamic Stats -->
       <div class="stat section">
         <h4>AI Prediction</h4>
-        <div class="green" style="font-weight:700;margin-top:8px">Low Risk</div>
+        <div id="predictionText" class="green" style="font-weight:700;margin-top:8px">—</div>
       </div>
+
       <div class="stat section">
         <h4>Risk Level</h4>
-        <div class="green" style="font-weight:700;margin-top:8px">18% <span class="muted small">↓2%</span></div>
+        <div id="riskText" class="green" style="font-weight:700;margin-top:8px">— <span class="muted small">—</span></div>
       </div>
+
       <div class="stat section">
         <h4>Last Test Date</h4>
-        <div style="margin-top:8px"><strong>2025-10-28</strong></div>
+        <div style="margin-top:8px"><strong id="lastTestText">—</strong></div>
       </div>
     </div>
 
+    <!-- ✅ Chart -->
     <div class="chart section" style="margin-top:18px">
-      <h4>Diagnosis history</h4>
-      <img src="https://quickchart.io/chart?c={type:'line',data:{labels:['Jan','Mar','May','Jul','Sep','Nov'],datasets:[{data:[40,65,83,72,80,41],fill:false}]},options:{plugins:{legend:{display:false}}}}" alt="chart">
+      <h4>Diagnosis History</h4>
+      <img id="chartImg" src="https://quickchart.io/chart?c={type:'line',data:{labels:['Jan','Mar','May','Jul','Sep','Nov'],datasets:[{data:[0,0,0,0,0,0],fill:false}]},options:{plugins:{legend:{display:false}}}}" alt="chart">
     </div>
   </main>
 
@@ -64,6 +69,35 @@
     <div class="small muted">2025 NeuroScan AI — Tracking minds intelligently</div>
   </footer>
 
-  <script src="script.js"></script>
+  <!-- ✅ JavaScript to Connect Backend -->
+  <script>
+    document.getElementById("searchBtn").addEventListener("click", async () => {
+      const name = document.getElementById("patientInput").value.trim();
+      if (!name) return alert("Please enter a patient name!");
+
+      try {
+        const res = await fetch(`http://localhost:5001/api/patient/${name}`);
+        const data = await res.json();
+
+        if (data.error) {
+          alert(data.error);
+          return;
+        }
+
+        // Update dashboard
+        document.getElementById("predictionText").textContent = data.prediction;
+        document.getElementById("riskText").innerHTML = `${data.risk}% <span class="muted small">${data.change > 0 ? "↑" : "↓"}${Math.abs(data.change)}%</span>`;
+        document.getElementById("lastTestText").textContent = data.lastTest;
+
+        // Update chart dynamically
+        const chartUrl = `https://quickchart.io/chart?c={type:'line',data:{labels:['Jan','Mar','May','Jul','Sep','Nov'],datasets:[{data:[${data.chartData.join(",")}],fill:false,borderColor:'rgb(81,108,196)'}]},options:{plugins:{legend:{display:false}}}}`;
+        document.getElementById("chartImg").src = chartUrl;
+
+      } catch (err) {
+        console.error(err);
+        alert("Error fetching patient data. Please check backend connection.");
+      }
+    });
+  </script>
 </body>
 </html>
