@@ -163,14 +163,30 @@ app.get("/api/patient/:name/history", async (req, res) => {
 
     const latestRecord = records[0];
 
-    // Prepare timeline data for graphing
-    const timeline = records.reverse().map(record => ({
-      date: new Date(record.scanDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      risk: record.risk,
-      prediction: record.prediction,
-      confidence: record.confidence,
-      fullDate: record.scanDate
-    }));
+    // Prepare timeline data for graphing (progressive class over time)
+    const timeline = records.reverse().map(record => {
+      // Determine class index from chartData or prediction text
+      let classIndex = -1;
+      if (Array.isArray(record.chartData) && record.chartData.length >= 4) {
+        const maxVal = Math.max(...record.chartData.slice(0, 4));
+        classIndex = record.chartData.slice(0, 4).indexOf(maxVal);
+      } else if (typeof record.prediction === 'string') {
+        const txt = record.prediction.toLowerCase();
+        if (txt.includes('alzheimer')) classIndex = 0;
+        else if (txt.includes('cognitively normal') || txt.includes('normal')) classIndex = 1;
+        else if (txt.includes('emci') || txt.includes('early mild')) classIndex = 2;
+        else if (txt.includes('lmci') || txt.includes('late mild')) classIndex = 3;
+      }
+
+      return {
+        date: new Date(record.scanDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        risk: record.risk,
+        prediction: record.prediction,
+        confidence: record.confidence,
+        fullDate: record.scanDate,
+        classIndex
+      };
+    });
 
     res.json({
       name: latestRecord.name,

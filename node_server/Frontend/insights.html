@@ -74,7 +74,7 @@
 
     <!-- ✅ Chart -->
     <div id="chartSection" class="chart section" style="margin-top:18px;display:none;">
-      <h4>Latest Scan - Prediction Probabilities</h4>
+      <h4>Predicted Class Progression Over Time</h4>
       <img id="chartImg" src="" alt="chart" style="width:100%;max-width:100%;height:auto;">
     </div>
 
@@ -167,50 +167,49 @@
           day: 'numeric' 
         });
 
-        // Build bar chart for 4-class probabilities from latest scan
-        const chartLabels = [
+        // Build progressive class-over-time line chart
+        const classLabels = [
           "Alzheimer's Disease",
           "Cognitively Normal",
           "Early MCI",
           "Late MCI"
         ];
-        const probabilities = (latest.chartData && latest.chartData.length) ? latest.chartData : [0,0,0,0];
+        const timelinePoints = data.timeline
+          .filter(t => t.classIndex !== undefined && t.classIndex !== null && t.classIndex >= 0)
+          .map(t => ({ x: t.date, y: Math.max(0, Math.min(3, t.classIndex)) }));
+
         const chartUrl = `https://quickchart.io/chart?bkg=white&c=${encodeURIComponent(JSON.stringify({
-          type: 'bar',
+          type: 'line',
           data: {
-            labels: chartLabels,
             datasets: [{
-              label: 'Prediction Probability (%)',
-              data: probabilities,
-              backgroundColor: [
-                'rgba(255, 99, 132, 0.7)',
-                'rgba(75, 192, 192, 0.7)',
-                'rgba(255, 206, 86, 0.7)',
-                'rgba(153, 102, 255, 0.7)'
-              ],
-              borderColor: [
-                'rgba(255, 99, 132, 1)',
-                'rgba(75, 192, 192, 1)',
-                'rgba(255, 206, 86, 1)',
-                'rgba(153, 102, 255, 1)'
-              ],
-              borderWidth: 2
+              label: 'Predicted Class',
+              data: timelinePoints,
+              parsing: false,
+              spanGaps: true,
+              borderColor: 'rgb(81, 108, 196)',
+              backgroundColor: 'rgba(81, 108, 196, 0.2)',
+              pointRadius: 5,
+              pointHoverRadius: 7,
+              tension: 0,
+              stepped: true,
+              showLine: true
             }]
           },
           options: {
             responsive: true,
             plugins: {
-              legend: { display: false },
-              title: { display: true, text: 'Classification Probabilities' }
+              legend: { display: true, position: 'top' },
+              title: { display: true, text: 'Predicted Class Over Time' }
             },
             scales: {
-              y: {
-                beginAtZero: true,
-                max: 100,
-                title: { display: true, text: 'Probability (%)' }
-              },
               x: {
-                title: { display: true, text: 'Diagnosis Category' }
+                type: 'category',
+                title: { display: true, text: 'Scan Date' }
+              },
+              y: {
+                type: 'category',
+                labels: classLabels,
+                title: { display: true, text: 'Predicted Class' }
               }
             }
           }
