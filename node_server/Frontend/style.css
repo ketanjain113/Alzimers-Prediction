@@ -202,6 +202,37 @@ body{
   .h1{ font-size:42px }
 }
 
+/* enhanced mobile responsiveness */
+@media (max-width:768px){
+  .site{ padding:0 16px }
+  .header-inner{ flex-wrap:wrap; height:auto; padding:8px 0 }
+  .nav{ gap:12px; overflow-x:auto; -webkit-overflow-scrolling:touch; width:100%; order:3; padding-bottom:6px }
+  .nav a{ white-space:nowrap; padding:8px 4px }
+  .header-right{ width:100%; justify-content:flex-start }
+  .hero-left{ padding-right:0 }
+  .h1{ font-size:36px }
+  .lead{ font-size:15px }
+  .hero-actions{ flex-wrap:wrap }
+  .brain-card{ width:100%; max-width:340px; height:340px }
+  .memory-grid{ grid-template-columns: repeat(3, 100px) }
+  .stat{ width:100% }
+  .uploader{ flex-wrap:wrap }
+  .scan-card input[type="text"],
+  .scan-card input[type="file"]{ width:100% !important }
+  .scan-card .btn{ width:100% }
+  .predict-wrap{ margin:32px auto; padding:20px }
+}
+
+@media (max-width:480px){
+  .site{ padding:0 12px }
+  .h1{ font-size:30px }
+  .hero-actions .btn{ width:100% }
+  .brain-card{ max-width:300px; height:300px }
+  .memory-grid{ grid-template-columns: repeat(2, 100px) }
+  .btn{ padding:10px 14px }
+  .form input, .form textarea{ font-size:14px }
+}
+
 /* subtle hover effects */
 .section:hover, .feature:hover, .stat:hover { transform: translateY(-6px); box-shadow: 0 18px 36px rgba(2,6,23,0.5) }
 
