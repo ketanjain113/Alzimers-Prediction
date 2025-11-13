@@ -53,10 +53,8 @@ if (frontendDir) {
   });
 }
 
-// ✅ Flask Model API URL
 const MODEL_API_URL = process.env.MODEL_API_URL || "http://127.0.0.1:5000";
 
-// ✅ Prediction Route (uploads image → forwards to Flask → saves to DB)
 app.post("/api/predict", upload.single("image"), async (req, res) => {
   try {
     if (!req.file) {
@@ -66,7 +64,6 @@ app.post("/api/predict", upload.single("image"), async (req, res) => {
     const form = new FormData();
     form.append("image", fs.createReadStream(req.file.path));
 
-    // Forward to Flask API
     const response = await fetch(`${MODEL_API_URL}/predict`, {
       method: "POST",
       body: form,
@@ -82,26 +79,32 @@ app.post("/api/predict", upload.single("image"), async (req, res) => {
       throw new Error("Flask did not return valid JSON:\n" + text);
     }
 
-    // Check if Flask returned an error
     if (result.error) {
       throw new Error(`Model API error: ${result.error}`);
     }
 
-    // 🧠 Map Flask response to our format
     const confidence = result.confidence || 0;
-    const risk = Math.round(confidence * 100); // Convert confidence to risk percentage
+    const risk = Math.round(confidence * 100);
     const probabilities = result.probabilities || [];
+
+    // Debug log to verify model outputs per request
+    try {
+      console.log("Model summary → prediction:", result.prediction);
+      console.log("Model summary → confidence:", confidence);
+      if (Array.isArray(probabilities)) {
+        console.log("Model summary → probabilities (len=", probabilities.length, "):", probabilities);
+      } else {
+        console.log("Model summary → probabilities: not an array", probabilities);
+      }
+    } catch (e) {}
     
-    // Calculate change based on class probabilities (simplified)
     const change = probabilities.length >= 2 ? 
       Math.round((probabilities[0] - probabilities[1]) * 100) : 0;
     
-    // Generate chart data from probabilities
     const chartData = probabilities.length > 0 ? 
       probabilities.map(p => Math.round(p * 100)) : 
-      [40, 60, 75, 80, 90];
+      [25, 25, 25, 25];
 
-    // 🧠 Save prediction result to MongoDB
     const patientName = req.body.name || "unknown";
     const newPatient = new Patient({
       name: patientName.toLowerCase(),
@@ -119,13 +122,10 @@ app.post("/api/predict", upload.single("image"), async (req, res) => {
       console.log("✅ Saved new patient scan:", newPatient);
     } catch (saveErr) {
       console.error("⚠️ MongoDB save failed (continuing anyway):", saveErr.message);
-      // Continue even if save fails - still return prediction to user
     }
 
-    // Cleanup temp file
     fs.unlinkSync(req.file.path);
 
-    // Return formatted response for frontend
     res.json({ 
       message: "Prediction completed and saved!", 
       prediction: result.prediction,
@@ -141,7 +141,6 @@ app.post("/api/predict", upload.single("image"), async (req, res) => {
   }
 });
 
-// ✅ Health Check Route (Flask)
 app.get("/api/health", async (req, res) => {
   try {
     const resp = await fetch(`${MODEL_API_URL}/health`);
@@ -163,11 +162,9 @@ app.get("/api/health", async (req, res) => {
   }
 });
 
-// ✅ Fetch ALL records for a patient by name (for insights/history)
 app.get("/api/patient/:name/history", async (req, res) => {
   try {
     const name = req.params.name.trim();
-    // Find all records for this patient, sorted by date (newest first)
     const records = await Patient.find({ name: new RegExp(`^${name}$`, "i") })
       .sort({ scanDate: -1 });
     
@@ -175,17 +172,32 @@ app.get("/api/patient/:name/history", async (req, res) => {
       return res.status(404).json({ message: "No records found for this patient" });
     }
 
-    // Get the latest record for current stats
     const latestRecord = records[0];
 
-    // Prepare timeline data for graphing
-    const timeline = records.reverse().map(record => ({
-      date: new Date(record.scanDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      risk: record.risk,
-      prediction: record.prediction,
-      confidence: record.confidence,
-      fullDate: record.scanDate
-    }));
+    // Prepare timeline data for graphing (progressive class over time)
+    const timeline = records.reverse().map(record => {
+      // Determine class index from chartData or prediction text
+      let classIndex = -1;
+      if (Array.isArray(record.chartData) && record.chartData.length >= 4) {
+        const maxVal = Math.max(...record.chartData.slice(0, 4));
+        classIndex = record.chartData.slice(0, 4).indexOf(maxVal);
+      } else if (typeof record.prediction === 'string') {
+        const txt = record.prediction.toLowerCase();
+        if (txt.includes('alzheimer')) classIndex = 0;
+        else if (txt.includes('cognitively normal') || txt.includes('normal')) classIndex = 1;
+        else if (txt.includes('emci') || txt.includes('early mild')) classIndex = 2;
+        else if (txt.includes('lmci') || txt.includes('late mild')) classIndex = 3;
+      }
+
+      return {
+        date: new Date(record.scanDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        risk: record.risk,
+        prediction: record.prediction,
+        confidence: record.confidence,
+        fullDate: record.scanDate,
+        classIndex
+      };
+    });
 
     res.json({
       name: latestRecord.name,
@@ -196,7 +208,8 @@ app.get("/api/patient/:name/history", async (req, res) => {
         change: latestRecord.change,
         confidence: latestRecord.confidence,
         date: latestRecord.scanDate,
-        lastTest: latestRecord.lastTest
+        lastTest: latestRecord.lastTest,
+        chartData: latestRecord.chartData || []
       },
       timeline: timeline,
       allRecords: records

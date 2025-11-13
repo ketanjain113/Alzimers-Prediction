@@ -62,7 +62,7 @@
           <div id="predictionText" style="font-weight:600;margin-top:4px;font-size:14px;">—</div>
         </div>
         <div>
-          <div class="muted small">Risk Level</div>
+          <div class="muted small">Confidence</div>
           <div id="riskText" class="green" style="font-weight:700;margin-top:4px;font-size:20px;">—</div>
         </div>
         <div>
@@ -74,7 +74,7 @@
 
     <!-- ✅ Chart -->
     <div id="chartSection" class="chart section" style="margin-top:18px;display:none;">
-      <h4>Risk Level History Over Time</h4>
+      <h4>Predicted Class Progression Over Time</h4>
       <img id="chartImg" src="" alt="chart" style="width:100%;max-width:100%;height:auto;">
     </div>
 
@@ -87,7 +87,7 @@
             <tr style="border-bottom:2px solid #516cc4;">
               <th style="padding:12px;text-align:left;">Date</th>
               <th style="padding:12px;text-align:left;">Prediction</th>
-              <th style="padding:12px;text-align:center;">Risk %</th>
+              <th style="padding:12px;text-align:center;">Confidence %</th>
             </tr>
           </thead>
           <tbody id="historyTableBody">
@@ -160,63 +160,60 @@
         // Update latest scan info
         const latest = data.latestScan;
         predictionText.textContent = latest.prediction;
-        riskText.textContent = `${latest.risk}%`;
+        riskText.textContent = `${(Number(latest.confidence || 0) * 100).toFixed(2)}%`;
         lastTestText.textContent = new Date(latest.date).toLocaleDateString('en-US', { 
           year: 'numeric', 
           month: 'long', 
           day: 'numeric' 
         });
 
-        // Build chart with timeline data
-        const labels = data.timeline.map(t => t.date);
-        const riskData = data.timeline.map(t => t.risk);
-        
+        // Build progressive class-over-time line chart
+        const classLabels = [
+          "Alzheimer's Disease",
+          "Cognitively Normal",
+          "Early MCI",
+          "Late MCI"
+        ];
+        const timelinePoints = data.timeline
+          .filter(t => t.classIndex !== undefined && t.classIndex !== null && t.classIndex >= 0)
+          .map(t => ({ x: t.date, y: Math.max(0, Math.min(3, t.classIndex)) }));
+
         const chartUrl = `https://quickchart.io/chart?bkg=white&c=${encodeURIComponent(JSON.stringify({
           type: 'line',
           data: {
-            labels: labels,
             datasets: [{
-              label: 'Risk Level (%)',
-              data: riskData,
-              fill: false,
+              label: 'Predicted Class',
+              data: timelinePoints,
+              parsing: false,
+              spanGaps: true,
               borderColor: 'rgb(81, 108, 196)',
-              backgroundColor: 'rgb(81, 108, 196)',
-              tension: 0.1,
+              backgroundColor: 'rgba(81, 108, 196, 0.2)',
               pointRadius: 5,
-              pointHoverRadius: 7
+              pointHoverRadius: 7,
+              tension: 0,
+              stepped: true,
+              showLine: true
             }]
           },
           options: {
             responsive: true,
             plugins: {
-              legend: {
-                display: true,
-                position: 'top'
-              },
-              title: {
-                display: true,
-                text: 'Risk Level Over Time'
-              }
+              legend: { display: true, position: 'top' },
+              title: { display: true, text: 'Predicted Class Over Time' }
             },
             scales: {
-              y: {
-                beginAtZero: true,
-                max: 100,
-                title: {
-                  display: true,
-                  text: 'Risk Percentage'
-                }
-              },
               x: {
-                title: {
-                  display: true,
-                  text: 'Scan Date'
-                }
+                type: 'category',
+                title: { display: true, text: 'Scan Date' }
+              },
+              y: {
+                type: 'category',
+                labels: classLabels,
+                title: { display: true, text: 'Predicted Class' }
               }
             }
           }
         }))}`;
-        
         chartImg.src = chartUrl;
 
         // Populate history table
@@ -233,7 +230,7 @@
               minute: '2-digit'
             })}</td>
             <td style="padding:12px;">${record.prediction.substring(0, 50)}...</td>
-            <td style="padding:12px;text-align:center;font-weight:600;">${record.risk}%</td>
+            <td style="padding:12px;text-align:center;font-weight:600;">${(Number(record.confidence || 0) * 100).toFixed(2)}%</td>
           `;
           historyTableBody.appendChild(row);
         });
